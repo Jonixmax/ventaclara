@@ -57,7 +57,4 @@ Requisitos: Node.js 22 LTS (mínimo 20.19) y una cuenta en MongoDB Atlas. Verifi
 | POST | /api/ventas | Propietaria y empleado | Registra una venta (descuenta stock y numera el comprobante) |
 | GET | /api/ventas/resumen-hoy | Solo propietaria | Total del día y desglose por rubro |
 
-## Reglas del equipo
 
-- El archivo `.env` NUNCA se sube a GitHub (ya está en `.gitignore`).
-- El precio de una venta lo decide la API con el catálogo; el navegador nunca lo envía.
