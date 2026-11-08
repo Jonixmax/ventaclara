@@ -51,6 +51,7 @@ export default function Panel() {
         </section>
       </div>
       <Link className="btn btn-enlace" to="/vender">Nueva venta</Link>
+      {esPropietaria && <Link className="btn btn-claro btn-enlace" to="/reportes">Cerrar caja del día</Link>}
     </Pagina>
   );
 }

@@ -16,4 +16,5 @@ export const ESTADOS_STOCK = {
   rojo: { texto: 'Pedir ya', clase: 'rojo' },
   amarillo: { texto: 'Por agotarse', clase: 'amarillo' },
   verde: { texto: 'Bien', clase: 'verde' },
+  inactivo: { texto: 'Inactivo', clase: 'inactivo' },
 };

@@ -11,4 +11,14 @@ function rangoDelDia(fecha = new Date()) {
   return { inicio, fin };
 }
 
-module.exports = { rangoDelDia };
+// Devuelve el inicio y el fin del mes local que contiene a la fecha dada
+function rangoDelMes(fecha = new Date()) {
+  const local = new Date(fecha.getTime() + DESFASE_HORAS * HORA_MS);
+  const anio = local.getUTCFullYear();
+  const mes = local.getUTCMonth();
+  const inicio = new Date(Date.UTC(anio, mes, 1) - DESFASE_HORAS * HORA_MS);
+  const fin = new Date(Date.UTC(anio, mes + 1, 1) - DESFASE_HORAS * HORA_MS);
+  return { inicio, fin };
+}
+
+module.exports = { rangoDelDia, rangoDelMes };

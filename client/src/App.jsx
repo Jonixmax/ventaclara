@@ -6,6 +6,7 @@ import Venta from './paginas/Venta';
 import Inventario from './paginas/Inventario';
 import Comprobante from './paginas/Comprobante';
 import Reportes from './paginas/Reportes';
+import ProductoForm from './paginas/ProductoForm';
 
 function Protegida({ children, soloPropietaria = false }) {
   const { sesion, esPropietaria } = useAuth();
@@ -24,6 +25,8 @@ export default function App() {
       <Route path="/inventario" element={<Protegida><Inventario /></Protegida>} />
       <Route path="/comprobante" element={<Protegida><Comprobante /></Protegida>} />
       <Route path="/reportes" element={<Protegida soloPropietaria><Reportes /></Protegida>} />
+      <Route path="/producto/nuevo" element={<Protegida soloPropietaria><ProductoForm /></Protegida>} />
+      <Route path="/producto/:id" element={<Protegida soloPropietaria><ProductoForm /></Protegida>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

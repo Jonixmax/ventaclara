@@ -5,11 +5,11 @@ const Rubro = require('../models/Rubro');
 const Contador = require('../models/Contador');
 const { crearError } = require('../utils/errores');
 const { aCentavos, deCentavos, calcularSubtotal, aNumero } = require('../utils/dinero');
-const { rangoDelDia } = require('../utils/fechas');
+const { rangoDelDia, rangoDelMes } = require('../utils/fechas');
 const { formatearFolio } = require('../utils/folio');
 
 const ES_OBJECT_ID = /^[a-f0-9]{24}$/i;
-const aDecimal = (centavos) => mongoose.Types.Decimal128.fromString(deCentavos(centavos).toFixed(2));
+const { aDecimal } = require('../utils/decimal128');
 
 // Valida la forma de los items que manda el navegador y junta los productos repetidos
 function normalizarItems(items) {
@@ -117,9 +117,8 @@ async function registrarVenta(itemsSolicitados, usuarioId) {
   return { venta, alertas };
 }
 
-// Resumen del día para el panel de la propietaria: total y desglose por rubro
-async function resumenDelDia(fecha = new Date()) {
-  const { inicio, fin } = rangoDelDia(fecha);
+// Resumen de ventas de un rango de fechas: total y desglose por rubro
+async function resumenDeRango(inicio, fin) {
   const filtro = { fecha: { $gte: inicio, $lt: fin } };
   const [filas, cantidadVentas, rubros] = await Promise.all([
     Venta.aggregate([
@@ -138,7 +137,19 @@ async function resumenDelDia(fecha = new Date()) {
     total: deCentavos(totalPorRubro.get(String(r._id)) || 0),
   }));
   const total = porRubro.reduce((suma, r) => suma + aCentavos(r.total), 0);
-  return { fecha: inicio, cantidadVentas, total: deCentavos(total), porRubro };
+  return { fecha: inicio, desde: inicio, hasta: fin, cantidadVentas, total: deCentavos(total), porRubro };
 }
 
-module.exports = { registrarVenta, resumenDelDia, normalizarItems, prepararVenta };
+// Resumen del día para el panel y el cierre de caja
+async function resumenDelDia(fecha = new Date()) {
+  const { inicio, fin } = rangoDelDia(fecha);
+  return resumenDeRango(inicio, fin);
+}
+
+// Resumen del mes para los reportes de la propietaria
+async function resumenDelMes(fecha = new Date()) {
+  const { inicio, fin } = rangoDelMes(fecha);
+  return resumenDeRango(inicio, fin);
+}
+
+module.exports = { registrarVenta, resumenDelDia, resumenDelMes, normalizarItems, prepararVenta };

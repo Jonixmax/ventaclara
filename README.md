@@ -9,13 +9,13 @@ ventaclara/
   server/    API REST (Node.js, Express y MongoDB)
     src/models/       colecciones: Usuario, Rubro, Producto, Venta, CierreCaja, Contador
     src/middleware/   sesión (token) y permisos por rol
-    src/services/     lógica de negocio: inicio de sesión y ventas (con transacción)
+    src/services/     lógica de negocio: sesión, ventas (con transacción), productos y cierre de caja
     src/routes/       rutas de la API
     src/utils/        funciones: semáforo de stock, dinero, fechas, folio
     src/scripts/      seed.js (datos de ejemplo)
-    test/             30 pruebas automáticas (no necesitan base de datos)
+    test/             40 pruebas automáticas (no necesitan base de datos)
   client/    Interfaz web (React + Vite)
-    src/paginas/      Login, Panel, Venta, Inventario, Comprobante, Reportes (pendiente)
+    src/paginas/      Login, Panel, Venta, Inventario, Comprobante, Reportes y cierre de caja, Formulario de producto
     src/componentes/  estructura común y etiqueta del semáforo
     src/estilos.css   temas y estilos (punto 8 del documento)
 ```
@@ -56,5 +56,14 @@ Requisitos: Node.js 22 LTS (mínimo 20.19) y una cuenta en MongoDB Atlas. Verifi
 | GET | /api/productos/alertas | Con sesión | Productos por agotarse |
 | POST | /api/ventas | Propietaria y empleado | Registra una venta (descuenta stock y numera el comprobante) |
 | GET | /api/ventas/resumen-hoy | Solo propietaria | Total del día y desglose por rubro |
+| GET | /api/productos?todos=1 | Solo propietaria | Catálogo incluyendo productos inactivos |
+| POST | /api/productos | Solo propietaria | Agrega un producto |
+| PUT | /api/productos/:id | Solo propietaria | Edita, ajusta existencias, activa o desactiva |
+| GET | /api/reportes/rubros?periodo=hoy\|mes | Solo propietaria | Ventas por rubro del día o del mes |
+| GET | /api/cierres/previsualizar | Solo propietaria | Total del sistema hoy y si ya hay cierre |
+| POST | /api/cierres | Solo propietaria | Guarda el cierre de caja del día (uno por día) |
 
+## Reglas del equipo
 
+- El archivo `.env` NUNCA se sube a GitHub (ya está en `.gitignore`).
+- El precio de una venta lo decide la API con el catálogo; el navegador nunca lo envía.

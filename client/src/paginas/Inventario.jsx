@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import Pagina from '../componentes/Pagina';
 import Etiqueta from '../componentes/Etiqueta';
 
 export default function Inventario() {
-  const { llamar } = useAuth();
+  const { llamar, esPropietaria } = useAuth();
   const [params, setParams] = useSearchParams();
   const [rubros, setRubros] = useState([]);
   const [productos, setProductos] = useState([]);
@@ -15,17 +15,18 @@ export default function Inventario() {
 
   useEffect(() => {
     let activo = true;
-    Promise.all([llamar('/api/rubros'), llamar('/api/productos')])
+    // La propietaria también ve los productos inactivos, para poder reactivarlos
+    Promise.all([llamar('/api/rubros'), llamar(esPropietaria ? '/api/productos?todos=1' : '/api/productos')])
       .then(([r, p]) => { if (activo) { setRubros(r); setProductos(p); } })
       .catch((e) => activo && setError(e.message));
     return () => { activo = false; };
-  }, [llamar]);
+  }, [llamar, esPropietaria]);
 
   const colores = useMemo(() => Object.fromEntries(rubros.map((r) => [r.id, r.color])), [rubros]);
   const visibles = productos
     .filter((p) => rubroId === 'todos' || p.rubroId === rubroId)
-    .filter((p) => !soloAlertas || p.estadoStock !== 'verde')
-    .sort((a, b) => a.existencias - b.existencias);
+    .filter((p) => !soloAlertas || (p.activo && p.estadoStock !== 'verde'))
+    .sort((a, b) => Number(!a.activo) - Number(!b.activo) || a.existencias - b.existencias);
 
   return (
     <Pagina titulo="Inventario" subtitulo="Existencias por rubro">
@@ -39,6 +40,7 @@ export default function Inventario() {
           </button>
         ))}
       </div>
+      {esPropietaria && <Link className="btn btn-enlace" to="/producto/nuevo">Agregar producto</Link>}
       <button type="button" className="btn btn-claro"
         onClick={() => setParams(soloAlertas ? {} : { alertas: '1' })}>
         {soloAlertas ? 'Ver todos los productos' : 'Ver solo alertas'}
@@ -46,13 +48,18 @@ export default function Inventario() {
       {visibles.length === 0 && !error && <p className="m centro">No hay productos para mostrar.</p>}
       {visibles.map((p) => (
         <div className="c fila" key={p.id}>
-          <span>
+          <span className="nombre-producto">
             <span className="muestra" style={{ background: colores[p.rubroId] }} />
             {p.nombre}
             <br />
             <span className="m">Quedan {p.existencias}</span>
           </span>
-          <Etiqueta estado={p.estadoStock} />
+          <span className="acciones">
+            <Etiqueta estado={p.activo ? p.estadoStock : 'inactivo'} />
+            {esPropietaria && (
+              <Link className="enlace-boton" to={`/producto/${p.id}`} aria-label={`Editar ${p.nombre}`}>Editar</Link>
+            )}
+          </span>
         </div>
       ))}
     </Pagina>
