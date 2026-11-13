@@ -7,6 +7,7 @@ const { crearError } = require('../utils/errores');
 const { aCentavos, deCentavos, calcularSubtotal, aNumero } = require('../utils/dinero');
 const { rangoDelDia, rangoDelMes } = require('../utils/fechas');
 const { formatearFolio } = require('../utils/folio');
+const { leerEfectivoRecibido, calcularPago } = require('../utils/pago');
 
 const ES_OBJECT_ID = /^[a-f0-9]{24}$/i;
 const { aDecimal } = require('../utils/decimal128');
@@ -60,11 +61,13 @@ function prepararVenta(solicitados, productos) {
 }
 
 // Procedimiento "Registrar venta" (punto 4.2): todo ocurre en una transacción
-async function registrarVenta(itemsSolicitados, usuarioId) {
+async function registrarVenta(itemsSolicitados, usuarioId, efectivoRecibido) {
   const solicitados = normalizarItems(itemsSolicitados);
+  const recibidoCentavos = leerEfectivoRecibido(efectivoRecibido);
   const ids = solicitados.map((s) => s.productoId);
   const productos = await Producto.find({ _id: { $in: ids } });
   const { items, totalCentavos } = prepararVenta(solicitados, productos);
+  const pago = calcularPago(totalCentavos, recibidoCentavos);
 
   const sesion = await mongoose.startSession();
   let venta;
@@ -90,6 +93,9 @@ async function registrarVenta(itemsSolicitados, usuarioId) {
             numeroComprobante: formatearFolio(contador.valor),
             usuarioId,
             total: aDecimal(totalCentavos),
+            ...(pago.recibidoCentavos !== null
+              ? { efectivoRecibido: aDecimal(pago.recibidoCentavos), vuelto: aDecimal(pago.vueltoCentavos) }
+              : {}),
             items: items.map((i) => ({
               productoId: i.productoId,
               nombre: i.nombre,

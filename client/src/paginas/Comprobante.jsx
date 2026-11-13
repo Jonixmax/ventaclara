@@ -37,6 +37,12 @@ export default function Comprobante() {
         ))}
         <hr />
         <div className="fila"><b>Total</b><b className="total">{dinero(venta.total)}</b></div>
+        {venta.efectivoRecibido != null && (
+          <>
+            <div className="fila"><span>Recibido</span><span>{dinero(venta.efectivoRecibido)}</span></div>
+            <div className="fila"><b>Vuelto</b><b>{dinero(venta.vuelto)}</b></div>
+          </>
+        )}
         <p className="m centro">Gracias por su compra</p>
       </section>
       {alertas.length > 0 && (

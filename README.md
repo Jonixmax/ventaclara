@@ -9,11 +9,11 @@ ventaclara/
   server/    API REST (Node.js, Express y MongoDB)
     src/models/       colecciones: Usuario, Rubro, Producto, Venta, CierreCaja, Contador
     src/middleware/   sesión (token) y permisos por rol
-    src/services/     lógica de negocio: sesión, ventas (con transacción), productos y cierre de caja
+    src/services/     lógica de negocio: sesión, ventas (con transacción y vuelto), productos y cierre de caja
     src/routes/       rutas de la API
     src/utils/        funciones: semáforo de stock, dinero, fechas, folio
     src/scripts/      seed.js (datos de ejemplo)
-    test/             40 pruebas automáticas (no necesitan base de datos)
+    test/             47 pruebas automáticas (no necesitan base de datos)
   client/    Interfaz web (React + Vite)
     src/paginas/      Login, Panel, Venta, Inventario, Comprobante, Reportes y cierre de caja, Formulario de producto
     src/componentes/  estructura común y etiqueta del semáforo
@@ -54,7 +54,7 @@ Requisitos: Node.js 22 LTS (mínimo 20.19) y una cuenta en MongoDB Atlas. Verifi
 | GET | /api/rubros | Con sesión | Lista los rubros |
 | GET | /api/productos | Con sesión | Catálogo (opcional `?rubroId=`) |
 | GET | /api/productos/alertas | Con sesión | Productos por agotarse |
-| POST | /api/ventas | Propietaria y empleado | Registra una venta (descuenta stock y numera el comprobante) |
+| POST | /api/ventas | Propietaria y empleado | Registra una venta (descuenta stock, numera el comprobante y, si se envía `efectivoRecibido`, calcula y guarda el vuelto) |
 | GET | /api/ventas/resumen-hoy | Solo propietaria | Total del día y desglose por rubro |
 | GET | /api/productos?todos=1 | Solo propietaria | Catálogo incluyendo productos inactivos |
 | POST | /api/productos | Solo propietaria | Agrega un producto |
@@ -62,6 +62,12 @@ Requisitos: Node.js 22 LTS (mínimo 20.19) y una cuenta en MongoDB Atlas. Verifi
 | GET | /api/reportes/rubros?periodo=hoy\|mes | Solo propietaria | Ventas por rubro del día o del mes |
 | GET | /api/cierres/previsualizar | Solo propietaria | Total del sistema hoy y si ya hay cierre |
 | POST | /api/cierres | Solo propietaria | Guarda el cierre de caja del día (uno por día) |
+
+## Modo claro y oscuro
+
+El botón "Oscuro" / "Claro" de la barra superior (y de la pantalla de inicio de sesión) cambia el tema.
+Se recuerda la elección; si nunca se eligió, se usa el tema del dispositivo. Los colores están definidos
+como variables al inicio de `client/src/estilos.css`. El comprobante siempre se imprime en claro.
 
 ## Reglas del equipo
 

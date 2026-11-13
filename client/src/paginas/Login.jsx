@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../AuthContext';
+import BotonTema from '../componentes/BotonTema';
 
 export default function Login() {
   const { login } = useAuth();
@@ -27,6 +28,7 @@ export default function Login() {
   return (
     <div className="login">
       <div className="barra barra-login">
+        <div className="acciones-login"><BotonTema /></div>
         <h1>VentaClara</h1>
         <p>Control de ventas de su tienda</p>
       </div>

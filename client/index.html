@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#0F4C81" />
     <title>VentaClara</title>
+    <script>
+      // Aplica el tema guardado (o el del dispositivo) antes de dibujar la página, para evitar un destello
+      try {
+        var tema = localStorage.getItem('ventaclara_tema');
+        if (tema !== 'claro' && tema !== 'oscuro') {
+          tema = matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro';
+        }
+        document.documentElement.dataset.tema = tema;
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

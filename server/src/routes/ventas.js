@@ -5,10 +5,10 @@ const { requerirSesion, requerirRol } = require('../middleware/auth');
 const router = Router();
 
 // POST /api/ventas  (propietaria y empleado)
-// Cuerpo: { items: [{ productoId, cantidad }] }. El precio NO se recibe: lo toma la API del catálogo.
+// Cuerpo: { items: [{ productoId, cantidad }], efectivoRecibido (opcional) }. El precio NO se recibe: lo toma la API del catálogo.
 router.post('/', requerirSesion, requerirRol('propietaria', 'empleado'), async (req, res, next) => {
   try {
-    const resultado = await registrarVenta(req.body?.items, req.usuario.id);
+    const resultado = await registrarVenta(req.body?.items, req.usuario.id, req.body?.efectivoRecibido);
     res.status(201).json(resultado);
   } catch (error) {
     next(error);

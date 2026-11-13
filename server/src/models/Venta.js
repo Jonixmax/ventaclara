@@ -7,6 +7,11 @@ const dinero = {
   validate: { validator: (v) => Number(v.toString()) >= 0, message: 'El monto no puede ser negativo.' },
 };
 
+const montoOpcional = {
+  validator: (v) => v == null || Number(v.toString()) >= 0,
+  message: 'El monto no puede ser negativo.',
+};
+
 const itemVentaSchema = new Schema(
   {
     productoId: { type: Schema.Types.ObjectId, ref: 'Producto', required: true },
@@ -34,6 +39,9 @@ const ventaSchema = new Schema(
       validate: { validator: (v) => v.length >= 1, message: 'Agregue al menos un producto.' },
     },
     total: dinero,
+    // Opcionales: dinero que entregó el cliente y vuelto que se le devolvió
+    efectivoRecibido: { type: Schema.Types.Decimal128, validate: montoOpcional },
+    vuelto: { type: Schema.Types.Decimal128, validate: montoOpcional },
   },
   { timestamps: { createdAt: 'creadoEn', updatedAt: false } }
 );
@@ -48,6 +56,8 @@ ventaSchema.set('toJSON', {
     delete ret._id;
     delete ret.__v;
     ret.total = aNumero(ret.total);
+    if (ret.efectivoRecibido != null) ret.efectivoRecibido = aNumero(ret.efectivoRecibido);
+    if (ret.vuelto != null) ret.vuelto = aNumero(ret.vuelto);
     ret.items = ret.items.map((i) => ({
       ...i,
       precioUnitario: aNumero(i.precioUnitario),
