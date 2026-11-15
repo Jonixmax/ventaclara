@@ -1,9 +1,21 @@
 const jwt = require('jsonwebtoken');
 
-// Exige una sesión válida: lee el token del encabezado Authorization: Bearer <token>
-function requerirSesion(req, res, next) {
+const COOKIE_SESION = 'ventaclara_sesion';
+
+function leerToken(req) {
+  const cookie = (req.headers.cookie || '')
+    .split(';')
+    .map((parte) => parte.trim())
+    .find((parte) => parte.startsWith(`${COOKIE_SESION}=`));
+  if (cookie) return cookie.slice(COOKIE_SESION.length + 1);
   const [tipo, token] = (req.headers.authorization || '').split(' ');
-  if (tipo !== 'Bearer' || !token) {
+  return tipo === 'Bearer' ? token : null;
+}
+
+// Exige una sesión válida: prioriza la cookie HttpOnly y mantiene compatibilidad con clientes Bearer.
+function requerirSesion(req, res, next) {
+  const token = leerToken(req);
+  if (!token) {
     return res.status(401).json({ mensaje: 'Debe iniciar sesión.' });
   }
   try {
@@ -24,4 +36,4 @@ function requerirRol(...rolesPermitidos) {
   };
 }
 
-module.exports = { requerirSesion, requerirRol };
+module.exports = { requerirSesion, requerirRol, COOKIE_SESION };

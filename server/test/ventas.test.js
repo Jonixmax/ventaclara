@@ -2,8 +2,12 @@ process.env.JWT_SECRET = 'secreto-de-prueba';
 const test = require('node:test');
 const assert = require('node:assert');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const app = require('../src/app');
-const { normalizarItems, prepararVenta } = require('../src/services/ventaService');
+const Producto = require('../src/models/Producto');
+const Venta = require('../src/models/Venta');
+const CierreCaja = require('../src/models/CierreCaja');
+const { anularVenta, normalizarItems, normalizarConsultaHistorial, prepararVenta } = require('../src/services/ventaService');
 const { rangoDelDia } = require('../src/utils/fechas');
 const { formatearFolio } = require('../src/utils/folio');
 
@@ -14,6 +18,41 @@ const catalogo = [
   { _id: ID_A, nombre: 'Arroz 1 lb', rubroId: RUBRO, precio: '0.60', existencias: 30, activo: true },
   { _id: ID_B, nombre: 'Hilo blanco', rubroId: RUBRO, precio: '0.75', existencias: 1, activo: true },
 ];
+
+async function conAnulacionSimulada(cierreExiste, ejecutar) {
+  const originales = {
+    startSession: mongoose.startSession,
+    findVenta: Venta.findById,
+    existeCierre: CierreCaja.exists,
+    actualizarProducto: Producto.findByIdAndUpdate,
+  };
+  const venta = {
+    fecha: new Date('2026-11-03T18:00:00Z'),
+    estado: 'vigente',
+    items: [{ productoId: ID_A, cantidad: 2, nombre: 'Arroz 1 lb' }],
+    save: async () => venta,
+  };
+  const stockDevuelto = [];
+  mongoose.startSession = async () => ({
+    withTransaction: async (operacion) => operacion(),
+    endSession: async () => {},
+  });
+  Venta.findById = () => ({ session: async () => venta });
+  CierreCaja.exists = () => ({ session: async () => (cierreExiste ? { _id: 'cierre' } : null) });
+  Producto.findByIdAndUpdate = async (id, cambio) => {
+    stockDevuelto.push({ id, cantidad: cambio.$inc.existencias });
+    return { _id: id };
+  };
+
+  try {
+    await ejecutar({ venta, stockDevuelto });
+  } finally {
+    mongoose.startSession = originales.startSession;
+    Venta.findById = originales.findVenta;
+    CierreCaja.exists = originales.existeCierre;
+    Producto.findByIdAndUpdate = originales.actualizarProducto;
+  }
+}
 
 test('normalizar: exige al menos un producto', () => {
   assert.throws(() => normalizarItems([]), { message: 'Agregue al menos un producto.' });
@@ -32,6 +71,43 @@ test('normalizar: rechaza identificadores inválidos y junta productos repetidos
   assert.throws(() => normalizarItems([{ productoId: '123', cantidad: 1 }]), { message: 'Este producto no está disponible.' });
   const juntos = normalizarItems([{ productoId: ID_A, cantidad: 1 }, { productoId: ID_A, cantidad: 2 }]);
   assert.deepStrictEqual(juntos, [{ productoId: ID_A, cantidad: 3 }]);
+});
+
+test('historial: valida rango de fechas, folio y paginación', () => {
+  const consulta = normalizarConsultaHistorial({
+    desde: '2026-11-03',
+    hasta: '2026-11-03',
+    comprobante: ' v-000123 ',
+    pagina: '2',
+    limite: '10',
+  });
+  assert.strictEqual(consulta.desde.inicio.toISOString(), '2026-11-03T06:00:00.000Z');
+  assert.strictEqual(consulta.hasta.fin.toISOString(), '2026-11-04T06:00:00.000Z');
+  assert.strictEqual(consulta.comprobante, 'V-000123');
+  assert.strictEqual(consulta.pagina, 2);
+  assert.throws(() => normalizarConsultaHistorial({ desde: '2026-02-30' }), { status: 400 });
+  assert.throws(() => normalizarConsultaHistorial({ desde: '2026-11-04', hasta: '2026-11-03' }), { status: 400 });
+  assert.throws(() => normalizarConsultaHistorial({ limite: '101' }), { status: 400 });
+});
+
+test('anular: devuelve existencias y guarda motivo y autor una sola vez', async () => {
+  await conAnulacionSimulada(false, async ({ venta, stockDevuelto }) => {
+    await anularVenta(ID_A, 'usuario-1', 'Error de digitación');
+    assert.deepStrictEqual(stockDevuelto, [{ id: ID_A, cantidad: 2 }]);
+    assert.strictEqual(venta.estado, 'anulada');
+    assert.strictEqual(venta.motivoAnulacion, 'Error de digitación');
+    assert.strictEqual(venta.anuladaPor, 'usuario-1');
+    await assert.rejects(anularVenta(ID_A, 'usuario-1', 'Error duplicado'), { status: 409 });
+    assert.strictEqual(stockDevuelto.length, 1);
+  });
+});
+
+test('anular: bloquea ventas de un día cerrado sin cambiar el stock', async () => {
+  await conAnulacionSimulada(true, async ({ venta, stockDevuelto }) => {
+    await assert.rejects(anularVenta(ID_A, 'usuario-1', 'Error de digitación'), { status: 409 });
+    assert.deepStrictEqual(stockDevuelto, []);
+    assert.strictEqual(venta.estado, 'vigente');
+  });
 });
 
 test('venta: el precio sale del catálogo y los totales se calculan en centavos', () => {
@@ -99,6 +175,12 @@ test('API de ventas: sesión, permisos y validaciones previas a la base de datos
     const resumenEmpleado = await enviar('/api/ventas/resumen-hoy', { headers: { Authorization: `Bearer ${token('empleado')}` } });
     assert.strictEqual(resumenEmpleado.status, 403);
     assert.strictEqual((await resumenEmpleado.json()).mensaje, 'No tiene permiso para esta acción.');
+
+    const fechaInvalida = await enviar('/api/ventas?desde=2026-02-30', { headers: { Authorization: `Bearer ${token('empleado')}` } });
+    assert.strictEqual(fechaInvalida.status, 400);
+
+    const empleadoAnula = await enviar(`/api/ventas/${ID_A}/anular`, json('empleado', { motivo: 'Error de digitación' }));
+    assert.strictEqual(empleadoAnula.status, 403);
   } finally {
     servidor.close();
   }

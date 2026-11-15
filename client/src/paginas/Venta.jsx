@@ -92,7 +92,7 @@ export default function Venta() {
           ...(textoRecibido ? { efectivoRecibido: textoRecibido } : {}),
         },
       });
-      navegar('/comprobante', { state: resultado });
+      navegar(`/comprobante/${resultado.venta.id}`, { state: { alertas: resultado.alertas } });
     } catch (e) {
       setError(e.message);
       setGuardando(false);

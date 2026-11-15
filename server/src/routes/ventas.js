@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { registrarVenta, resumenDelDia } = require('../services/ventaService');
+const { registrarVenta, listarVentas, obtenerVenta, anularVenta, resumenDelDia } = require('../services/ventaService');
 const { productoVisible, ventaVisible } = require('../utils/visibilidad');
 const { requerirSesion, requerirRol } = require('../middleware/auth');
 
@@ -21,10 +21,44 @@ router.post('/', requerirSesion, requerirRol('propietaria', 'empleado'), async (
   }
 });
 
+// GET /api/ventas  (propietaria y empleado)
+router.get('/', requerirSesion, requerirRol('propietaria', 'empleado'), async (req, res, next) => {
+  try {
+    const resultado = await listarVentas(req.query);
+    const propietaria = req.usuario.rol === 'propietaria';
+    res.json({
+      ...resultado,
+      ventas: resultado.ventas.map((venta) => ventaVisible(venta, propietaria)),
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/ventas/resumen-hoy  (solo propietaria: son datos financieros)
 router.get('/resumen-hoy', requerirSesion, requerirRol('propietaria'), async (req, res, next) => {
   try {
     res.json(await resumenDelDia());
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/ventas/:id/anular  (solo propietaria)
+router.post('/:id/anular', requerirSesion, requerirRol('propietaria'), async (req, res, next) => {
+  try {
+    const venta = await anularVenta(req.params.id, req.usuario.id, req.body?.motivo);
+    res.json({ venta: ventaVisible(venta, true) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/ventas/:id  (propietaria y empleado)
+router.get('/:id', requerirSesion, requerirRol('propietaria', 'empleado'), async (req, res, next) => {
+  try {
+    const venta = await obtenerVenta(req.params.id);
+    res.json({ venta: ventaVisible(venta, req.usuario.rol === 'propietaria') });
   } catch (error) {
     next(error);
   }

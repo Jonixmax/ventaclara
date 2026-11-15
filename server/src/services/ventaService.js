@@ -3,6 +3,7 @@ const Producto = require('../models/Producto');
 const Venta = require('../models/Venta');
 const Rubro = require('../models/Rubro');
 const Contador = require('../models/Contador');
+const CierreCaja = require('../models/CierreCaja');
 const { crearError } = require('../utils/errores');
 const { aCentavos, deCentavos, calcularSubtotal, aNumero } = require('../utils/dinero');
 const { rangoDelDia, rangoDelMes } = require('../utils/fechas');
@@ -126,13 +127,109 @@ async function registrarVenta(itemsSolicitados, usuarioId, efectivoRecibido) {
   return { venta, alertas };
 }
 
+function normalizarConsultaHistorial(consulta = {}) {
+  function leerFecha(valor, campo) {
+    if (valor === undefined || valor === '') return null;
+    if (typeof valor !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
+      throw crearError(400, `La fecha ${campo} no es válida.`);
+    }
+    const [anio, mes, dia] = valor.split('-').map(Number);
+    const mediodia = new Date(Date.UTC(anio, mes - 1, dia, 12));
+    if (mediodia.toISOString().slice(0, 10) !== valor) throw crearError(400, `La fecha ${campo} no es válida.`);
+    return rangoDelDia(mediodia);
+  }
+
+  const desde = leerFecha(consulta.desde, 'inicial');
+  const hasta = leerFecha(consulta.hasta, 'final');
+  if (desde && hasta && desde.inicio >= hasta.fin) throw crearError(400, 'La fecha inicial debe ser anterior o igual a la fecha final.');
+
+  const pagina = consulta.pagina === undefined ? 1 : Number(consulta.pagina);
+  const limite = consulta.limite === undefined ? 20 : Number(consulta.limite);
+  if (!Number.isInteger(pagina) || pagina < 1) throw crearError(400, 'La página no es válida.');
+  if (!Number.isInteger(limite) || limite < 1 || limite > 100) throw crearError(400, 'El límite debe estar entre 1 y 100.');
+
+  const comprobante = String(consulta.comprobante || '').trim().toUpperCase();
+  if (comprobante.length > 30) throw crearError(400, 'El comprobante no es válido.');
+  return { desde, hasta, pagina, limite, comprobante };
+}
+
+async function listarVentas(consulta) {
+  const filtros = normalizarConsultaHistorial(consulta);
+  const filtro = {};
+  if (filtros.desde || filtros.hasta) {
+    filtro.fecha = {};
+    if (filtros.desde) filtro.fecha.$gte = filtros.desde.inicio;
+    if (filtros.hasta) filtro.fecha.$lt = filtros.hasta.fin;
+  }
+  if (filtros.comprobante) filtro.numeroComprobante = filtros.comprobante;
+  const [ventas, total] = await Promise.all([
+    Venta.find(filtro).sort({ fecha: -1, _id: -1 }).skip((filtros.pagina - 1) * filtros.limite).limit(filtros.limite),
+    Venta.countDocuments(filtro),
+  ]);
+  return {
+    ventas,
+    pagina: filtros.pagina,
+    limite: filtros.limite,
+    total,
+    paginas: Math.ceil(total / filtros.limite),
+  };
+}
+
+async function obtenerVenta(id) {
+  if (!ES_OBJECT_ID.test(String(id))) throw crearError(404, 'No se encontró la venta.');
+  const venta = await Venta.findById(id);
+  if (!venta) throw crearError(404, 'No se encontró la venta.');
+  return venta;
+}
+
+async function anularVenta(id, usuarioId, motivo) {
+  if (!ES_OBJECT_ID.test(String(id))) throw crearError(404, 'No se encontró la venta.');
+  const motivoLimpio = typeof motivo === 'string' ? motivo.trim() : '';
+  if (motivoLimpio.length < 5 || motivoLimpio.length > 200) {
+    throw crearError(400, 'Explique el motivo de la anulación (de 5 a 200 caracteres).');
+  }
+
+  const sesion = await mongoose.startSession();
+  let venta;
+  try {
+    await sesion.withTransaction(async () => {
+      venta = await Venta.findById(id).session(sesion);
+      if (!venta) throw crearError(404, 'No se encontró la venta.');
+      if (venta.estado === 'anulada') throw crearError(409, 'Esta venta ya fue anulada.');
+
+      const { inicio } = rangoDelDia(venta.fecha);
+      if (await CierreCaja.exists({ fecha: inicio }).session(sesion)) {
+        throw crearError(409, 'No se puede anular una venta de un día que ya tiene cierre de caja.');
+      }
+
+      for (const item of venta.items) {
+        const producto = await Producto.findByIdAndUpdate(
+          item.productoId,
+          { $inc: { existencias: item.cantidad } },
+          { session: sesion, new: true }
+        );
+        if (!producto) throw crearError(409, `No se pudo devolver al inventario ${item.nombre}.`);
+      }
+
+      venta.estado = 'anulada';
+      venta.motivoAnulacion = motivoLimpio;
+      venta.anuladaPor = usuarioId;
+      venta.anuladaEn = new Date();
+      await venta.save({ session: sesion });
+    });
+  } finally {
+    await sesion.endSession();
+  }
+  return venta;
+}
+
 // Tipos numéricos de MongoDB: sirven para saber si un item de venta tiene costo registrado
 const TIPOS_NUMERICOS = ['decimal', 'double', 'int', 'long'];
 
 // Resumen de ventas de un rango de fechas: total, ganancia estimada y desglose por rubro.
 // La ganancia solo cuenta los productos con costo registrado; el resto se reporta aparte.
 async function resumenDeRango(inicio, fin) {
-  const filtro = { fecha: { $gte: inicio, $lt: fin } };
+  const filtro = { fecha: { $gte: inicio, $lt: fin }, estado: { $ne: 'anulada' } };
   const tieneCosto = { $in: [{ $type: '$items.costoUnitario' }, TIPOS_NUMERICOS] };
   const [filas, cantidadVentas, rubros] = await Promise.all([
     Venta.aggregate([
@@ -197,4 +294,14 @@ async function resumenDelMes(fecha = new Date()) {
   return resumenDeRango(inicio, fin);
 }
 
-module.exports = { registrarVenta, resumenDelDia, resumenDelMes, normalizarItems, prepararVenta };
+module.exports = {
+  registrarVenta,
+  listarVentas,
+  obtenerVenta,
+  anularVenta,
+  resumenDelDia,
+  resumenDelMes,
+  normalizarItems,
+  normalizarConsultaHistorial,
+  prepararVenta,
+};

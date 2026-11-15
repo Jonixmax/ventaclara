@@ -62,3 +62,52 @@ test('API: salud, login incompleto, ruta protegida y ruta inexistente', async ()
     servidor.close();
   }
 });
+
+test('seguridad: aplica cabeceras, valida el origen y limita intentos de inicio de sesión', async () => {
+  const servidor = app.listen(0);
+  const base = `http://127.0.0.1:${servidor.address().port}`;
+  try {
+    const salud = await fetch(`${base}/api/salud`, { headers: { Origin: 'http://localhost:5173' } });
+    assert.strictEqual(salud.headers.get('x-content-type-options'), 'nosniff');
+    assert.strictEqual(salud.headers.get('access-control-allow-credentials'), 'true');
+
+    const origenAjeno = await fetch(`${base}/api/auth/logout`, {
+      method: 'POST',
+      headers: { Origin: 'https://otro-sitio.example' },
+    });
+    assert.strictEqual(origenAjeno.status, 403);
+
+    let limitado = false;
+    for (let intento = 0; intento < 12; intento += 1) {
+      const respuesta = await fetch(`${base}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (respuesta.status === 429) limitado = true;
+    }
+    assert.ok(limitado, 'se esperaba que el limitador bloqueara intentos excesivos');
+  } finally {
+    servidor.close();
+  }
+});
+
+test('sesión: autentica con cookie HttpOnly y la elimina al cerrar sesión', async () => {
+  const servidor = app.listen(0);
+  const base = `http://127.0.0.1:${servidor.address().port}`;
+  const token = jwt.sign({ id: 'u1', rol: 'empleado', nombre: 'Ana' }, process.env.JWT_SECRET);
+  try {
+    const sesion = await fetch(`${base}/api/auth/session`, {
+      headers: { Cookie: `ventaclara_sesion=${token}` },
+    });
+    assert.strictEqual(sesion.status, 200);
+    assert.deepStrictEqual((await sesion.json()).usuario, { id: 'u1', nombre: 'Ana', rol: 'empleado' });
+
+    const salir = await fetch(`${base}/api/auth/logout`, { method: 'POST' });
+    assert.strictEqual(salir.status, 204);
+    assert.match(salir.headers.get('set-cookie'), /HttpOnly/i);
+    assert.match(salir.headers.get('set-cookie'), /Expires=Thu, 01 Jan 1970/i);
+  } finally {
+    servidor.close();
+  }
+});

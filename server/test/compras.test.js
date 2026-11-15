@@ -5,8 +5,9 @@ const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 const app = require('../src/app');
 const Producto = require('../src/models/Producto');
+const PedidoCompra = require('../src/models/PedidoCompra');
 const Venta = require('../src/models/Venta');
-const { normalizarItemsCompra, prepararCompra, productosConPrecioBajo } = require('../src/services/compraService');
+const { normalizarItemsCompra, prepararCompra, productosConPrecioBajo, normalizarFechaEsperada, programarPedido } = require('../src/services/compraService');
 const { prepararProducto } = require('../src/services/productoService');
 const { cantidadSugerida } = require('../src/utils/inventario');
 const { formatearFolio } = require('../src/utils/folio');
@@ -44,6 +45,53 @@ test('compra: un producto no puede repetirse', () => {
     () => normalizarItemsCompra([{ productoId: ID_A, cantidad: 1, costoUnitario: '1' }, { productoId: ID_A, cantidad: 2, costoUnitario: '1' }]),
     { message: 'Un producto aparece repetido en la compra.' }
   );
+});
+
+test('pedido: valida y conserva la fecha de recepción en formato local', () => {
+  assert.strictEqual(normalizarFechaEsperada('2026-11-15'), '2026-11-15');
+  for (const fecha of ['', '2026-02-30', '15-11-2026', undefined]) {
+    assert.throws(() => normalizarFechaEsperada(fecha), { status: 400, message: 'Escriba una fecha de recepción válida.' });
+  }
+});
+
+test('pedido: mantiene la fecha y devuelve los costos como números', () => {
+  const pedido = new PedidoCompra({
+    fechaEsperada: '2026-11-15',
+    usuarioId: oid(),
+    items: [{ productoId: oid(), nombre: 'Arroz 1 lb', rubroId: oid(), cantidad: 2, costoUnitario: '1.25', subtotal: '2.50' }],
+    total: '2.50',
+  }).toJSON();
+  assert.strictEqual(pedido.fechaEsperada, '2026-11-15');
+  assert.strictEqual(pedido.items[0].costoUnitario, 1.25);
+  assert.strictEqual(pedido.total, 2.5);
+  assert.ok(pedido.id);
+});
+
+test('pedido: programarlo no modifica las existencias', async () => {
+  const originales = {
+    buscarProductos: Producto.find,
+    actualizarProducto: Producto.findOneAndUpdate,
+    crearPedido: PedidoCompra.create,
+  };
+  let actualizaciones = 0;
+  Producto.find = async () => catalogo;
+  Producto.findOneAndUpdate = async () => { actualizaciones += 1; };
+  PedidoCompra.create = async (pedidos) => pedidos;
+  try {
+    const pedido = await programarPedido(
+      [{ productoId: ID_A, cantidad: '5', costoUnitario: '0.45' }],
+      'usuario-prueba',
+      'Proveedor',
+      '2026-11-15'
+    );
+    assert.strictEqual(pedido.fechaEsperada, '2026-11-15');
+    assert.strictEqual(pedido.total.toString(), '2.25');
+    assert.strictEqual(actualizaciones, 0);
+  } finally {
+    Producto.find = originales.buscarProductos;
+    Producto.findOneAndUpdate = originales.actualizarProducto;
+    PedidoCompra.create = originales.crearPedido;
+  }
 });
 
 test('compra: calcula subtotales y total en centavos con el catálogo', () => {
@@ -128,6 +176,15 @@ test('API de compras: solo la propietaria y validaciones previas a la base de da
     assert.strictEqual((await enviar('/api/compras')).status, 401);
     assert.strictEqual((await enviar('/api/compras', 'empleado')).status, 403);
     assert.strictEqual((await enviar('/api/compras', 'empleado', 'POST', {})).status, 403);
+    assert.strictEqual((await enviar('/api/compras/pedidos')).status, 401);
+    assert.strictEqual((await enviar('/api/compras/pedidos', 'empleado')).status, 403);
+
+    const fechaInvalida = await enviar('/api/compras/pedidos', 'propietaria', 'POST', {
+      fechaEsperada: '2026-02-30',
+      items: [{ productoId: ID_A, cantidad: 5, costoUnitario: '0.45' }],
+    });
+    assert.strictEqual(fechaInvalida.status, 400);
+    assert.strictEqual((await fechaInvalida.json()).mensaje, 'Escriba una fecha de recepción válida.');
 
     const vacia = await enviar('/api/compras', 'propietaria', 'POST', { items: [] });
     assert.strictEqual(vacia.status, 400);

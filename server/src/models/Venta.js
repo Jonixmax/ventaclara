@@ -36,6 +36,10 @@ const ventaSchema = new Schema(
     numeroComprobante: { type: String, required: true, unique: true },
     fecha: { type: Date, required: true, default: Date.now },
     usuarioId: { type: Schema.Types.ObjectId, ref: 'Usuario', required: true },
+    estado: { type: String, enum: ['vigente', 'anulada'], default: 'vigente', required: true },
+    motivoAnulacion: { type: String, trim: true, maxlength: 200 },
+    anuladaPor: { type: Schema.Types.ObjectId, ref: 'Usuario' },
+    anuladaEn: { type: Date },
     items: {
       type: [itemVentaSchema],
       validate: { validator: (v) => v.length >= 1, message: 'Agregue al menos un producto.' },

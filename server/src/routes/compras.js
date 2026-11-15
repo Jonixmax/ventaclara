@@ -1,9 +1,35 @@
 const { Router } = require('express');
-const { registrarCompra, listarCompras } = require('../services/compraService');
+const { registrarCompra, listarCompras, programarPedido, listarPedidosPendientes, recibirPedido } = require('../services/compraService');
 const { productoVisible } = require('../utils/visibilidad');
 const { requerirSesion, requerirRol } = require('../middleware/auth');
 
 const router = Router();
+
+router.get('/pedidos', requerirSesion, requerirRol('propietaria'), async (req, res, next) => {
+  try {
+    res.json(await listarPedidosPendientes());
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/pedidos', requerirSesion, requerirRol('propietaria'), async (req, res, next) => {
+  try {
+    const pedido = await programarPedido(req.body?.items, req.usuario.id, req.body?.proveedor, req.body?.fechaEsperada);
+    res.status(201).json({ pedido });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post('/pedidos/:id/recibir', requerirSesion, requerirRol('propietaria'), async (req, res, next) => {
+  try {
+    const resultado = await recibirPedido(req.params.id);
+    res.json({ ...resultado, productos: resultado.productos.map((p) => productoVisible(p, true)) });
+  } catch (error) {
+    next(error);
+  }
+});
 
 // POST /api/compras  (solo propietaria)
 // Cuerpo: { proveedor (opcional), items: [{ productoId, cantidad, costoUnitario }] }

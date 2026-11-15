@@ -1,9 +1,18 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 
 const app = express();
+const clientOrigin = new URL(process.env.CLIENT_URL || 'http://localhost:5173').origin;
 
-app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:5173' }));
+app.use(helmet());
+app.use(cors({ origin: clientOrigin, credentials: true }));
+app.use((req, res, next) => {
+  if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  const origin = req.get('origin');
+  if (origin && origin !== clientOrigin) return res.status(403).json({ mensaje: 'Origen de la solicitud no permitido.' });
+  return next();
+});
 app.use(express.json());
 
 app.get('/api/salud', (req, res) => res.json({ estado: 'ok', sistema: 'VentaClara' }));

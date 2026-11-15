@@ -5,13 +5,16 @@ const CLAVE = 'ventaclara_tema';
 
 // Tema inicial: el que eligió el usuario; si nunca eligió, el del dispositivo
 function temaInicial() {
+  let tema;
   try {
     const guardado = localStorage.getItem(CLAVE);
-    if (guardado === 'claro' || guardado === 'oscuro') return guardado;
+    if (guardado === 'claro' || guardado === 'oscuro') tema = guardado;
   } catch {
     /* sin acceso al almacenamiento */
   }
-  return matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro';
+  if (!tema) tema = matchMedia('(prefers-color-scheme: dark)').matches ? 'oscuro' : 'claro';
+  document.documentElement.dataset.tema = tema;
+  return tema;
 }
 
 export function TemaProvider({ children }) {

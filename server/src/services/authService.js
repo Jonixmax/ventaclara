@@ -6,6 +6,8 @@ const { crearError } = require('../utils/errores');
 // Mensaje único para no revelar si falló el usuario o la contraseña
 const MENSAJE_INVALIDO = 'Usuario o contraseña incorrectos.';
 
+const DURACION_SESION_MS = 8 * 60 * 60 * 1000;
+
 async function login(usuario, password) {
   const encontrado = await Usuario.findOne({
     usuario: String(usuario).toLowerCase().trim(),
@@ -19,9 +21,13 @@ async function login(usuario, password) {
   const token = jwt.sign(
     { id: encontrado._id, rol: encontrado.rol, nombre: encontrado.nombre },
     process.env.JWT_SECRET,
-    { expiresIn: '8h' }
+    { expiresIn: DURACION_SESION_MS / 1000 }
   );
-  return { token, usuario: { id: encontrado._id, nombre: encontrado.nombre, rol: encontrado.rol } };
+  return {
+    token,
+    maxAge: DURACION_SESION_MS,
+    usuario: { id: encontrado._id, nombre: encontrado.nombre, rol: encontrado.rol },
+  };
 }
 
-module.exports = { login };
+module.exports = { login, DURACION_SESION_MS };
