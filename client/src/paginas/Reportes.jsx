@@ -60,8 +60,9 @@ export default function Reportes() {
   }
 
   const mostrarDiferencia = textoDiferencia();
+  const compras = datos?.compras;
   return (
-    <Pagina titulo="Reportes" subtitulo="Ventas por rubro y cierre de caja">
+    <Pagina titulo="Reportes" subtitulo="Ventas, ganancia y cierre de caja">
       <div className="fila-chips" role="group" aria-label="Periodo">
         <button type="button" className="chip" aria-pressed={periodo === 'hoy'}
           style={periodo === 'hoy' ? { background: '#0F4C81', borderColor: '#0F4C81', color: '#fff' } : undefined}
@@ -77,6 +78,17 @@ export default function Reportes() {
           <b className="total">{datos ? dinero(datos.total) : '…'}</b>
         </div>
         {datos && <div className="m">{datos.cantidadVentas} {datos.cantidadVentas === 1 ? 'venta' : 'ventas'}</div>}
+        {datos && (
+          <div className="fila">
+            <span>Ganancia estimada</span>
+            <b>{dinero(datos.ganancia)}</b>
+          </div>
+        )}
+        {datos?.itemsSinCosto > 0 && (
+          <p className="m" style={{ margin: 0 }}>
+            Hay ventas de productos sin costo registrado: la ganancia real puede ser mayor. Registre el costo en Compras o al editar el producto.
+          </p>
+        )}
         {(datos?.porRubro || []).map((r) => (
           <div key={r.rubroId}>
             <div className="fila">
@@ -86,8 +98,15 @@ export default function Reportes() {
             <div className="pista">
               <div className="relleno" style={{ width: `${datos.total > 0 ? (r.total / datos.total) * 100 : 0}%`, background: r.color }} />
             </div>
+            <div className="m">Ganancia de {r.nombre.toLowerCase()}: {dinero(r.ganancia)}</div>
           </div>
         ))}
+        {compras && (
+          <div className="fila">
+            <span>Compras de mercadería <span className="m">({compras.cantidad} {compras.cantidad === 1 ? 'compra' : 'compras'})</span></span>
+            <b>{dinero(compras.total)}</b>
+          </div>
+        )}
       </section>
 
       {periodo === 'hoy' && (cierre ? (

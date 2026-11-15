@@ -2,16 +2,23 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import Pagina from '../componentes/Pagina';
+import { dinero } from '../formato';
 
-const VACIO = { rubroId: '', nombre: '', precio: '', existencias: '', stockMinimo: '5', activo: true };
+const VACIO = { rubroId: '', nombre: '', precio: '', costo: '', existencias: '', stockMinimo: '5', activo: true };
+const MONTO = /^\d+([.,]\d{1,2})?$/;
+const centavos = (texto) => (MONTO.test(texto.trim()) ? Math.round(Number(texto.trim().replace(',', '.')) * 100) : null);
 
 // Mismas reglas que la API (punto 4.4); la API vuelve a validar todo
 function validar(d) {
   if (!d.rubroId) return 'Elija un rubro.';
   const nombre = d.nombre.trim();
   if (nombre.length < 2 || nombre.length > 80) return 'El nombre debe tener de 2 a 80 caracteres.';
-  const precio = d.precio.trim().replace(',', '.');
-  if (!/^\d+(\.\d{1,2})?$/.test(precio) || Number(precio) <= 0) return 'Escriba un precio válido, por ejemplo 0.75.';
+  const precio = centavos(d.precio);
+  if (precio === null || precio <= 0) return 'Escriba un precio válido, por ejemplo 0.75.';
+  if (d.costo.trim()) {
+    const costo = centavos(d.costo);
+    if (costo === null || costo <= 0) return 'Escriba el costo por unidad, por ejemplo 0.45.';
+  }
   if (!/^\d+$/.test(d.existencias.trim()) || !/^\d+$/.test(d.stockMinimo.trim())) return 'Escriba un número entero, cero o mayor.';
   return '';
 }
@@ -37,6 +44,7 @@ export default function ProductoForm() {
           if (!p) { setError('Producto no encontrado.'); return; }
           setDatos({
             rubroId: p.rubroId, nombre: p.nombre, precio: Number(p.precio).toFixed(2),
+            costo: p.costo != null ? Number(p.costo).toFixed(2) : '',
             existencias: String(p.existencias), stockMinimo: String(p.stockMinimo), activo: p.activo,
           });
         }
@@ -47,6 +55,11 @@ export default function ProductoForm() {
 
   const cambiar = (campo) => (e) => { setDatos({ ...datos, [campo]: e.target.value }); setError(''); };
 
+  // Ganancia por unidad en vivo, cuando precio y costo son válidos
+  const precioC = centavos(datos.precio);
+  const costoC = datos.costo.trim() ? centavos(datos.costo) : null;
+  const gananciaC = precioC !== null && costoC !== null ? precioC - costoC : null;
+
   async function guardar(evento) {
     evento.preventDefault();
     const problema = validar(datos);
@@ -54,7 +67,7 @@ export default function ProductoForm() {
     setGuardando(true);
     setError('');
     const cuerpo = {
-      rubroId: datos.rubroId, nombre: datos.nombre.trim(), precio: datos.precio.trim(),
+      rubroId: datos.rubroId, nombre: datos.nombre.trim(), precio: datos.precio.trim(), costo: datos.costo.trim(),
       existencias: datos.existencias.trim(), stockMinimo: datos.stockMinimo.trim(),
       ...(editando ? { activo: datos.activo } : {}),
     };
@@ -87,12 +100,28 @@ export default function ProductoForm() {
           <input id="nombre" type="text" placeholder="Por ejemplo: Azúcar 1 lb" value={datos.nombre} onChange={cambiar('nombre')} />
         </div>
         <div>
-          <label htmlFor="precio">Precio en dólares</label>
+          <label htmlFor="precio">Precio de venta (dólares)</label>
           <input id="precio" type="text" inputMode="decimal" placeholder="0.75" value={datos.precio} onChange={cambiar('precio')} />
         </div>
         <div>
-          <label htmlFor="existencias">Existencias (unidades)</label>
+          <label htmlFor="costo">Costo de compra por unidad (opcional)</label>
+          <input id="costo" type="text" inputMode="decimal" placeholder="0.45" value={datos.costo} onChange={cambiar('costo')} />
+          <p className="m ayuda">
+            {gananciaC === null
+              ? 'Lo que le cuesta a usted cada unidad. Sirve para calcular su ganancia y se actualiza solo al registrar compras.'
+              : gananciaC > 0
+                ? `Ganancia por unidad: ${dinero(gananciaC / 100)}`
+                : 'Ojo: con este costo se vendería sin ganancia o con pérdida.'}
+          </p>
+        </div>
+        <div>
+          <label htmlFor="existencias">{editando ? 'Existencias (unidades)' : 'Existencias iniciales (unidades)'}</label>
           <input id="existencias" type="text" inputMode="numeric" placeholder="0" value={datos.existencias} onChange={cambiar('existencias')} />
+          <p className="m ayuda">
+            {editando
+              ? 'Use esto solo para corregir el conteo. Para mercadería nueva use Compras: así queda registrado cuánto costó.'
+              : 'Unidades que hay hoy en el negocio.'}
+          </p>
         </div>
         <div>
           <label htmlFor="minimo">Stock mínimo</label>

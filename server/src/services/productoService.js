@@ -6,6 +6,7 @@ const { aDecimal } = require('../utils/decimal128');
 
 const ES_OBJECT_ID = /^[a-f0-9]{24}$/i;
 const MSG_PRECIO = 'Escriba un precio válido, por ejemplo 0.75.';
+const MSG_COSTO = 'Escriba el costo por unidad, por ejemplo 0.45.';
 const MSG_ENTERO = 'Escriba un número entero, cero o mayor.';
 
 // Limpia y valida los datos de un producto. Función pura: no toca la base de datos.
@@ -28,6 +29,17 @@ function prepararProducto(datos = {}, { parcial = false } = {}) {
     if (centavos <= 0) throw crearError(400, MSG_PRECIO);
     limpio.precioCentavos = centavos;
   }
+  // El costo es opcional: vacío o null significa "sin costo registrado"
+  if (viene('costo')) {
+    const vacio = datos.costo === null || String(datos.costo).trim() === '';
+    if (vacio) {
+      limpio.costoCentavos = null;
+    } else {
+      const centavos = montoACentavos(datos.costo, MSG_COSTO);
+      if (centavos <= 0) throw crearError(400, MSG_COSTO);
+      limpio.costoCentavos = centavos;
+    }
+  }
   if (!parcial || viene('existencias')) {
     limpio.existencias = enteroNoNegativo(datos.existencias, MSG_ENTERO);
   }
@@ -48,9 +60,10 @@ async function verificarRubro(rubroId) {
 }
 
 function aplicar(producto, limpio) {
-  const { precioCentavos, ...resto } = limpio;
+  const { precioCentavos, costoCentavos, ...resto } = limpio;
   Object.assign(producto, resto);
   if (precioCentavos !== undefined) producto.precio = aDecimal(precioCentavos);
+  if (costoCentavos !== undefined) producto.costo = costoCentavos === null ? undefined : aDecimal(costoCentavos);
 }
 
 // Procedimiento "Guardar producto" (punto 4.2): alta
@@ -62,7 +75,7 @@ async function crearProducto(datos) {
   return producto.save();
 }
 
-// Procedimiento "Guardar producto" (punto 4.2): edición, ajuste de existencias y activar o desactivar
+// Procedimiento "Guardar producto" (punto 4.2): edición, corrección de existencias y activar o desactivar
 async function actualizarProducto(id, datos) {
   if (!ES_OBJECT_ID.test(String(id))) throw crearError(404, 'Producto no encontrado.');
   const limpio = prepararProducto(datos, { parcial: true });

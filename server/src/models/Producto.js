@@ -1,5 +1,6 @@
 const { Schema, model } = require('mongoose');
 const { estadoStock } = require('../utils/estadoStock');
+const { cantidadSugerida } = require('../utils/inventario');
 const { aNumero } = require('../utils/dinero');
 
 const esEntero = {
@@ -23,6 +24,14 @@ const productoSchema = new Schema(
       validate: {
         validator: (v) => Number(v.toString()) > 0,
         message: 'Escriba un precio válido, por ejemplo 0.75.',
+      },
+    },
+    // Costo de compra por unidad (el de la última compra). Opcional: sirve para calcular la ganancia.
+    costo: {
+      type: Schema.Types.Decimal128,
+      validate: {
+        validator: (v) => v == null || Number(v.toString()) > 0,
+        message: 'Escriba el costo por unidad, por ejemplo 0.45.',
       },
     },
     existencias: {
@@ -61,7 +70,9 @@ productoSchema.set('toJSON', {
     delete ret._id;
     delete ret.__v;
     ret.precio = aNumero(ret.precio);
+    ret.costo = ret.costo == null ? null : aNumero(ret.costo);
     ret.estadoStock = estadoStock(ret.existencias, ret.stockMinimo);
+    ret.sugerido = cantidadSugerida(ret.existencias, ret.stockMinimo);
     return ret;
   },
 });

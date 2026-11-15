@@ -24,6 +24,8 @@ const itemVentaSchema = new Schema(
       validate: { validator: Number.isInteger, message: 'La cantidad debe ser un número entero.' },
     },
     precioUnitario: dinero,
+    // Costo del producto al momento de la venta (opcional): permite calcular la ganancia real
+    costoUnitario: { type: Schema.Types.Decimal128, validate: montoOpcional },
     subtotal: dinero,
   },
   { _id: false }
@@ -61,6 +63,7 @@ ventaSchema.set('toJSON', {
     ret.items = ret.items.map((i) => ({
       ...i,
       precioUnitario: aNumero(i.precioUnitario),
+      costoUnitario: i.costoUnitario == null ? undefined : aNumero(i.costoUnitario),
       subtotal: aNumero(i.subtotal),
     }));
     return ret;

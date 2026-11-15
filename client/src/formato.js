@@ -18,3 +18,10 @@ export const ESTADOS_STOCK = {
   verde: { texto: 'Bien', clase: 'verde' },
   inactivo: { texto: 'Inactivo', clase: 'inactivo' },
 };
+
+export const ESTADOS_TITULO = {
+  rojo: 'Hay que pedir ya',
+  amarillo: 'Por agotarse',
+  verde: 'Bien abastecidos',
+  inactivo: 'Inactivos',
+};

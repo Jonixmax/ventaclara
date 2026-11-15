@@ -23,6 +23,7 @@ export default function Pagina({ titulo, subtitulo, children }) {
         <NavLink to="/" end>Inicio</NavLink>
         <NavLink to="/vender">Vender</NavLink>
         <NavLink to="/inventario">Inventario</NavLink>
+        {esPropietaria && <NavLink to="/compras">Compras</NavLink>}
         {esPropietaria && <NavLink to="/reportes">Reportes</NavLink>}
       </nav>
       <main className="contenido">{children}</main>

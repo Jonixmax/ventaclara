@@ -13,6 +13,8 @@ app.use('/api/productos', require('./routes/productos'));
 app.use('/api/ventas', require('./routes/ventas'));
 app.use('/api/reportes', require('./routes/reportes'));
 app.use('/api/cierres', require('./routes/cierres'));
+app.use('/api/compras', require('./routes/compras'));
+app.use('/api/usuarios', require('./routes/usuarios'));
 
 app.use((req, res) => res.status(404).json({ mensaje: 'Ruta no encontrada.' }));
 

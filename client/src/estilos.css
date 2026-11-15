@@ -23,6 +23,9 @@
   --pista: #E5E7EB;
   --neutro: #E5E7EB;
   --foco: #1565C0;
+  --rojo-texto: #C62828;
+  --amarillo-texto: #8A6500;
+  --verde-texto: #2E7D32;
 }
 :root[data-tema='oscuro'] {
   color-scheme: dark;
@@ -44,6 +47,9 @@
   --pista: #2F3A45;
   --neutro: #2A333D;
   --foco: #8CC2F5;
+  --rojo-texto: #FF8A80;
+  --amarillo-texto: #F2B705;
+  --verde-texto: #6FCF7B;
 }
 
 * { box-sizing: border-box; }
@@ -129,6 +135,28 @@ input[type='checkbox'] { width: 28px; height: 28px; flex: none; accent-color: va
 .acciones-login { position: absolute; top: 16px; right: 16px; }
 .login-cuerpo { flex: 1; padding: 28px 20px; display: flex; flex-direction: column; gap: 20px; }
 .pie-login { padding: 0 20px 28px; margin: 0; }
+
+/* Inventario claro, compras y usuarios */
+.tarjetas-estado { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.tarjeta-estado { min-height: 84px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 8px 4px; border-radius: 12px; border: 2px solid var(--borde-campo); background: var(--tarjeta); color: var(--texto); font-size: 15px; font-weight: bold; cursor: pointer; }
+.tarjeta-estado .numero { font-size: 32px; line-height: 1; }
+.tarjeta-estado.rojo .numero { color: var(--rojo-texto); }
+.tarjeta-estado.amarillo .numero { color: var(--amarillo-texto); }
+.tarjeta-estado.verde .numero { color: var(--verde-texto); }
+.tarjeta-estado[aria-pressed='true'] { border-color: var(--acento); box-shadow: inset 0 0 0 2px var(--acento); }
+.grupo-titulo { margin: 8px 0 0; font-size: 19px; }
+.producto { display: flex; flex-direction: column; gap: 10px; }
+.cantidad { font-size: 30px; }
+.nivel-texto { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.consejo { margin: 0; }
+.acciones-fila { display: flex; gap: 8px; flex-wrap: wrap; }
+.error-suave { color: var(--error-texto); font-weight: bold; font-size: 15px; margin: 0; }
+.btn-mini { min-height: 44px; padding: 0 14px; border-radius: 10px; border: 2px solid var(--acento); background: var(--tarjeta); color: var(--acento); font-size: 16px; font-weight: bold; cursor: pointer; }
+.btn-mini:disabled { opacity: .5; cursor: not-allowed; }
+.dos-columnas { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.linea-compra { display: flex; flex-direction: column; gap: 10px; padding-bottom: 12px; border-bottom: 1px solid var(--borde); }
+.linea-compra:last-child { border-bottom: 0; padding-bottom: 0; }
+a.m { color: var(--acento); }
 
 @media (min-width: 768px) {
   .rejilla { display: grid; grid-template-columns: 1fr 1fr; }

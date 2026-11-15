@@ -8,6 +8,7 @@ const Producto = require('../models/Producto');
 const Venta = require('../models/Venta');
 const CierreCaja = require('../models/CierreCaja');
 const Contador = require('../models/Contador');
+const Compra = require('../models/Compra');
 
 // Contraseña de demostración: cámbiela antes de usar el sistema con datos reales
 const PASSWORD_DEMO = 'Ventaclara2026';
@@ -22,7 +23,7 @@ async function sembrar() {
 
   await Promise.all([
     Usuario.deleteMany({}), Rubro.deleteMany({}), Producto.deleteMany({}),
-    Venta.deleteMany({}), CierreCaja.deleteMany({}), Contador.deleteMany({}),
+    Venta.deleteMany({}), CierreCaja.deleteMany({}), Contador.deleteMany({}), Compra.deleteMany({}),
   ]);
 
   const rubros = await Rubro.insertMany([
@@ -38,20 +39,21 @@ async function sembrar() {
     { nombre: 'Empleado de apoyo', usuario: 'empleado1', passwordHash, rol: 'empleado' },
   ]);
 
-  // Precios y existencias de EJEMPLO: reemplácelos por los reales del negocio
+  // Precios, costos y existencias de EJEMPLO: reemplácelos por los reales del negocio
   await Producto.insertMany([
-    { rubroId: id['Víveres'], nombre: 'Arroz 1 lb', precio: '0.60', existencias: 30, stockMinimo: 5 },
-    { rubroId: id['Víveres'], nombre: 'Frijol 1 lb', precio: '0.85', existencias: 4, stockMinimo: 5 },
-    { rubroId: id['Víveres'], nombre: 'Aceite 1/2 litro', precio: '1.10', existencias: 9, stockMinimo: 5 },
-    { rubroId: id['Costura'], nombre: 'Hilo blanco', precio: '0.75', existencias: 12, stockMinimo: 6 },
-    { rubroId: id['Costura'], nombre: 'Botones (bolsa)', precio: '0.50', existencias: 40, stockMinimo: 10 },
-    { rubroId: id['Costura'], nombre: 'Agujas (paquete)', precio: '0.35', existencias: 25, stockMinimo: 5 },
-    { rubroId: id['Medicina'], nombre: 'Paracetamol 500 mg (tableta)', precio: '0.15', existencias: 25, stockMinimo: 5 },
-    { rubroId: id['Medicina'], nombre: 'Alcohol 70% (frasco)', precio: '1.25', existencias: 15, stockMinimo: 5 },
-    { rubroId: id['Medicina'], nombre: 'Suero oral', precio: '1.50', existencias: 12, stockMinimo: 4 },
+    { rubroId: id['Víveres'], nombre: 'Arroz 1 lb', precio: '0.60', costo: '0.45', existencias: 30, stockMinimo: 5 },
+    { rubroId: id['Víveres'], nombre: 'Frijol 1 lb', precio: '0.85', costo: '0.65', existencias: 4, stockMinimo: 5 },
+    { rubroId: id['Víveres'], nombre: 'Aceite 1/2 litro', precio: '1.10', costo: '0.85', existencias: 9, stockMinimo: 5 },
+    { rubroId: id['Costura'], nombre: 'Hilo blanco', precio: '0.75', costo: '0.50', existencias: 12, stockMinimo: 6 },
+    { rubroId: id['Costura'], nombre: 'Botones (bolsa)', precio: '0.50', costo: '0.30', existencias: 40, stockMinimo: 10 },
+    { rubroId: id['Costura'], nombre: 'Agujas (paquete)', precio: '0.35', costo: '0.20', existencias: 25, stockMinimo: 5 },
+    { rubroId: id['Medicina'], nombre: 'Paracetamol 500 mg (tableta)', precio: '0.15', costo: '0.08', existencias: 25, stockMinimo: 5 },
+    { rubroId: id['Medicina'], nombre: 'Alcohol 70% (frasco)', precio: '1.25', costo: '0.90', existencias: 15, stockMinimo: 5 },
+    { rubroId: id['Medicina'], nombre: 'Suero oral', precio: '1.50', costo: '1.10', existencias: 12, stockMinimo: 4 },
   ]);
 
   await Contador.create({ _id: 'comprobante', valor: 0 });
+  await Contador.create({ _id: 'compra', valor: 0 });
 
   console.log('Datos de ejemplo cargados.');
   console.log(`  propietaria -> usuario: elsy       contraseña: ${PASSWORD_DEMO}`);
