@@ -15,7 +15,13 @@ router.get('/pedidos', requerirSesion, requerirRol('propietaria'), async (req, r
 
 router.post('/pedidos', requerirSesion, requerirRol('propietaria'), async (req, res, next) => {
   try {
-    const pedido = await programarPedido(req.body?.items, req.usuario.id, req.body?.proveedor, req.body?.fechaEsperada);
+    const pedido = await programarPedido(
+      req.body?.items,
+      req.usuario.id,
+      req.body?.proveedor,
+      req.body?.fechaEsperada,
+      req.body?.distribuidorId
+    );
     res.status(201).json({ pedido });
   } catch (error) {
     next(error);

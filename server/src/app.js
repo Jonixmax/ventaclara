@@ -24,6 +24,7 @@ app.use('/api/reportes', require('./routes/reportes'));
 app.use('/api/cierres', require('./routes/cierres'));
 app.use('/api/compras', require('./routes/compras'));
 app.use('/api/usuarios', require('./routes/usuarios'));
+app.use('/api/distribuidores', require('./routes/distribuidores'));
 
 app.use((req, res) => res.status(404).json({ mensaje: 'Ruta no encontrada.' }));
 
@@ -42,6 +43,7 @@ app.use((err, req, res, next) => {
     if (campos.includes('rubroId') && campos.includes('nombre')) mensaje = 'Ya existe un producto con ese nombre en este rubro.';
     else if (campos.includes('fecha')) mensaje = 'Ya existe un cierre de caja para hoy.';
     else if (campos.includes('usuario')) mensaje = 'Ese usuario ya existe.';
+    else if (campos.includes('nombreClave')) mensaje = 'Ya existe un distribuidor con ese nombre.';
     else mensaje = 'Ya existe un registro con esos datos.';
   }
   if (status === 500) {

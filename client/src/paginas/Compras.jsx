@@ -15,13 +15,19 @@ const fechaLegible = (fecha) => new Date(`${fecha}T12:00:00`).toLocaleDateString
 export default function Compras() {
   const { llamar } = useAuth();
   const [params] = useSearchParams();
-  const [pestana, setPestana] = useState('nueva');
+  const [pestana, setPestana] = useState(() => (params.get('pestana') === 'calendario' ? 'calendario' : 'nueva'));
   const [rubros, setRubros] = useState([]);
   const [productos, setProductos] = useState([]);
   const [rubroId, setRubroId] = useState('');
   const [busqueda, setBusqueda] = useState('');
   const [lineas, setLineas] = useState({});
   const [proveedor, setProveedor] = useState('');
+  const [distribuidorId, setDistribuidorId] = useState('');
+  const [distribuidores, setDistribuidores] = useState(null);
+  const [distribuidorForm, setDistribuidorForm] = useState({ nombre: '', whatsapp: '' });
+  const [distribuidorEditando, setDistribuidorEditando] = useState('');
+  const [guardandoDistribuidor, setGuardandoDistribuidor] = useState(false);
+  const [mensajeDistribuidor, setMensajeDistribuidor] = useState('');
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
   const [resultado, setResultado] = useState(null);
@@ -78,9 +84,20 @@ export default function Compras() {
     return () => { activo = false; };
   }, [pestana, llamar]);
 
+  useEffect(() => {
+    if (pestana !== 'distribuidores' && pestana !== 'nueva') return undefined;
+    let activo = true;
+    llamar('/api/distribuidores')
+      .then((d) => activo && setDistribuidores(d))
+      .catch((e) => activo && setError(e.message));
+    return () => { activo = false; };
+  }, [pestana, llamar]);
+
   const texto = busqueda.trim().toLowerCase();
   const visibles = productos.filter((p) => p.rubroId === rubroId && p.nombre.toLowerCase().includes(texto));
   const elegidos = productos.filter((p) => lineas[p.id]);
+  const distribuidorElegido = (distribuidores || []).find((d) => d.id === distribuidorId && d.activo);
+  const nombreProveedor = distribuidorElegido?.nombre || proveedor.trim();
 
   const subtotalDe = (p) => {
     const l = lineas[p.id];
@@ -92,6 +109,7 @@ export default function Compras() {
 
   function agregar(p) {
     setError('');
+    setMensajeDistribuidor('');
     setLineas((actual) => ({ ...actual, [p.id]: lineaInicial(p) }));
   }
   function quitar(id) {
@@ -124,7 +142,7 @@ export default function Compras() {
       const respuesta = await llamar('/api/compras', {
         method: 'POST',
         cuerpo: {
-          proveedor: proveedor.trim(),
+          proveedor: nombreProveedor,
           items: elegidos.map((p) => ({ productoId: p.id, cantidad: lineas[p.id].cantidad.trim(), costoUnitario: lineas[p.id].costo.trim() })),
         },
       });
@@ -149,7 +167,8 @@ export default function Compras() {
       const respuesta = await llamar('/api/compras/pedidos', {
         method: 'POST',
         cuerpo: {
-          proveedor: proveedor.trim(),
+          proveedor: nombreProveedor,
+          distribuidorId: distribuidorElegido?.id,
           fechaEsperada,
           items: elegidos.map((p) => ({ productoId: p.id, cantidad: lineas[p.id].cantidad.trim(), costoUnitario: lineas[p.id].costo.trim() })),
         },
@@ -162,6 +181,7 @@ export default function Compras() {
       });
       setLineas({});
       setProveedor('');
+      setDistribuidorId('');
       setBusqueda('');
       setPestana('calendario');
     } catch (e) {
@@ -174,6 +194,7 @@ export default function Compras() {
   async function recibir(id) {
     setRecibiendo(id);
     setError('');
+    setMensajeDistribuidor('');
     setConfirmacionRecepcion('');
     try {
       const respuesta = await llamar(`/api/compras/pedidos/${id}/recibir`, { method: 'POST' });
@@ -188,10 +209,74 @@ export default function Compras() {
     }
   }
 
+  function iniciarEdicionDistribuidor(distribuidor) {
+    setDistribuidorEditando(distribuidor.id);
+    setDistribuidorForm({ nombre: distribuidor.nombre, whatsapp: `+${distribuidor.whatsapp}` });
+    setError('');
+    setMensajeDistribuidor('');
+  }
+
+  function cancelarEdicionDistribuidor() {
+    setDistribuidorEditando('');
+    setDistribuidorForm({ nombre: '', whatsapp: '' });
+    setMensajeDistribuidor('');
+  }
+
+  async function guardarDistribuidor(evento) {
+    evento.preventDefault();
+    const nombre = distribuidorForm.nombre.trim().replace(/\s+/g, ' ');
+    const whatsapp = distribuidorForm.whatsapp.trim();
+    if (nombre.length < 2 || nombre.length > 60) {
+      setError('El nombre debe tener de 2 a 60 caracteres.');
+      return;
+    }
+    if (!/^\+?[\d\s().-]+$/.test(whatsapp) || whatsapp.replace(/\D/g, '').length < 7 || whatsapp.replace(/\D/g, '').length > 15) {
+      setError('Escriba un WhatsApp válido con entre 7 y 15 dígitos.');
+      return;
+    }
+    setGuardandoDistribuidor(true);
+    setError('');
+    setMensajeDistribuidor('');
+    try {
+      const editando = Boolean(distribuidorEditando);
+      const ruta = editando ? `/api/distribuidores/${distribuidorEditando}` : '/api/distribuidores';
+      await llamar(ruta, {
+        method: editando ? 'PUT' : 'POST',
+        cuerpo: { nombre, whatsapp },
+      });
+      setDistribuidorForm({ nombre: '', whatsapp: '' });
+      setDistribuidorEditando('');
+      setMensajeDistribuidor(editando ? 'Distribuidor actualizado.' : 'Distribuidor agregado.');
+      setDistribuidores(await llamar('/api/distribuidores'));
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setGuardandoDistribuidor(false);
+    }
+  }
+
+  async function cambiarEstadoDistribuidor(distribuidor) {
+    setError('');
+    setMensajeDistribuidor('');
+    setConfirmacionRecepcion('');
+    try {
+      await llamar(`/api/distribuidores/${distribuidor.id}`, {
+        method: 'PUT',
+        cuerpo: { activo: !distribuidor.activo },
+      });
+      if (distribuidor.activo && distribuidorId === distribuidor.id) setDistribuidorId('');
+      setMensajeDistribuidor(distribuidor.activo ? `${distribuidor.nombre} quedó inactivo.` : `${distribuidor.nombre} quedó activo.`);
+      setDistribuidores(await llamar('/api/distribuidores'));
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   function otraCompra() {
     setResultado(null);
     setLineas({});
     setProveedor('');
+    setDistribuidorId('');
     setBusqueda('');
   }
 
@@ -204,9 +289,56 @@ export default function Compras() {
       <div className="fila-chips" role="group" aria-label="Sección">
         {botonPestana('nueva', 'Nueva compra')}
         {botonPestana('calendario', 'Calendario')}
+        {botonPestana('distribuidores', 'Distribuidores')}
         {botonPestana('historial', 'Historial')}
       </div>
       {error && <p className="error" role="alert">{error}</p>}
+
+      {pestana === 'distribuidores' && (
+        <>
+          {mensajeDistribuidor && <p className="aviso aviso-ok" role="status">{mensajeDistribuidor}</p>}
+          <form className="c lista formulario" onSubmit={guardarDistribuidor} noValidate>
+            <b>{distribuidorEditando ? 'Editar distribuidor' : 'Agregar distribuidor'}</b>
+            <div>
+              <label htmlFor="distribuidor-nombre">Nombre</label>
+              <input id="distribuidor-nombre" type="text" maxLength="60" value={distribuidorForm.nombre}
+                onChange={(e) => { setDistribuidorForm((actual) => ({ ...actual, nombre: e.target.value })); setError(''); }} />
+            </div>
+            <div>
+              <label htmlFor="distribuidor-whatsapp">WhatsApp</label>
+              <input id="distribuidor-whatsapp" type="tel" inputMode="tel" placeholder="+503 7000 0000" maxLength="24"
+                value={distribuidorForm.whatsapp}
+                onChange={(e) => { setDistribuidorForm((actual) => ({ ...actual, whatsapp: e.target.value })); setError(''); }} />
+              <p className="m ayuda">Incluya el código de país para abrir el chat directamente.</p>
+            </div>
+            <button className="btn" type="submit" disabled={guardandoDistribuidor}>
+              {guardandoDistribuidor ? 'Guardando…' : distribuidorEditando ? 'Guardar cambios' : 'Agregar distribuidor'}
+            </button>
+            {distribuidorEditando && (
+              <button className="btn btn-claro" type="button" onClick={cancelarEdicionDistribuidor}>Cancelar edición</button>
+            )}
+          </form>
+          {distribuidores === null && !error && <p className="m centro">Cargando distribuidores…</p>}
+          {distribuidores?.length === 0 && <p className="m centro">Todavía no hay distribuidores registrados.</p>}
+          {(distribuidores || []).map((distribuidor) => (
+            <section className="c lista" key={distribuidor.id}>
+              <div className="fila">
+                <b>{distribuidor.nombre}</b>
+                <span className={`etiqueta ${distribuidor.activo ? 'verde' : 'inactivo'}`}>{distribuidor.activo ? 'Activo' : 'Inactivo'}</span>
+              </div>
+              <a className="enlace-historial" href={`https://wa.me/${distribuidor.whatsapp}`} target="_blank" rel="noreferrer">
+                WhatsApp · +{distribuidor.whatsapp}
+              </a>
+              <div className="acciones-fila">
+                <button type="button" className="btn-mini" onClick={() => iniciarEdicionDistribuidor(distribuidor)}>Editar</button>
+                <button type="button" className="btn-mini" onClick={() => cambiarEstadoDistribuidor(distribuidor)}>
+                  {distribuidor.activo ? 'Inactivar' : 'Activar'}
+                </button>
+              </div>
+            </section>
+          ))}
+        </>
+      )}
 
       {pestana === 'calendario' && (
         <>
@@ -416,8 +548,23 @@ export default function Compras() {
 
           {elegidos.length > 0 && (
             <div>
-              <label htmlFor="proveedor">Proveedor (opcional)</label>
-              <input id="proveedor" type="text" placeholder="Por ejemplo: Distribuidora López" value={proveedor} onChange={(e) => setProveedor(e.target.value)} />
+              <label htmlFor="distribuidor-compra">Distribuidor</label>
+              <select id="distribuidor-compra" className="campo-select" value={distribuidorId}
+                onChange={(e) => setDistribuidorId(e.target.value)}>
+                <option value="">Otro o sin distribuidor</option>
+                {(distribuidores || []).filter((d) => d.activo).map((d) => (
+                  <option value={d.id} key={d.id}>{d.nombre}</option>
+                ))}
+              </select>
+              {!distribuidorId && (
+                <input id="proveedor" type="text" aria-label="Nombre del proveedor" placeholder="Nombre del proveedor (opcional)"
+                  value={proveedor} onChange={(e) => setProveedor(e.target.value)} />
+              )}
+              {distribuidorElegido && (
+                <a className="m enlace-historial" href={`https://wa.me/${distribuidorElegido.whatsapp}`} target="_blank" rel="noreferrer">
+                  Contactar por WhatsApp · +{distribuidorElegido.whatsapp}
+                </a>
+              )}
             </div>
           )}
           {elegidos.length > 0 && (

@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Producto = require('../models/Producto');
 const Compra = require('../models/Compra');
 const PedidoCompra = require('../models/PedidoCompra');
+const Distribuidor = require('../models/Distribuidor');
 const Contador = require('../models/Contador');
 const { crearError } = require('../utils/errores');
 const { aCentavos, deCentavos, calcularSubtotal, aNumero } = require('../utils/dinero');
@@ -129,9 +130,16 @@ async function registrarCompra(itemsSolicitados, usuarioId, proveedor) {
   return { compra, productos: actualizados, avisos: productosConPrecioBajo(items) };
 }
 
-async function programarPedido(itemsSolicitados, usuarioId, proveedor, fechaEsperada) {
+async function programarPedido(itemsSolicitados, usuarioId, proveedor, fechaEsperada, distribuidorId) {
   const solicitados = normalizarItemsCompra(itemsSolicitados);
-  const nombreProveedor = normalizarProveedor(proveedor);
+  let nombreProveedor = normalizarProveedor(proveedor);
+  let distribuidor;
+  if (distribuidorId) {
+    if (!ES_OBJECT_ID.test(String(distribuidorId))) throw crearError(400, 'El distribuidor seleccionado no es válido.');
+    distribuidor = await Distribuidor.findOne({ _id: distribuidorId, activo: true });
+    if (!distribuidor) throw crearError(400, 'El distribuidor seleccionado ya no está disponible.');
+    nombreProveedor = distribuidor.nombre;
+  }
   const fecha = normalizarFechaEsperada(fechaEsperada);
   const ids = solicitados.map((s) => s.productoId);
   const productos = await Producto.find({ _id: { $in: ids } });
@@ -139,6 +147,7 @@ async function programarPedido(itemsSolicitados, usuarioId, proveedor, fechaEspe
   const [pedido] = await PedidoCompra.create([{
     fechaEsperada: fecha,
     usuarioId,
+    ...(distribuidor ? { distribuidorId: distribuidor._id } : {}),
     ...(nombreProveedor ? { proveedor: nombreProveedor } : {}),
     total: aDecimal(totalCentavos),
     items: items.map((i) => ({

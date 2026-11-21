@@ -4,10 +4,30 @@ import { useAuth } from '../AuthContext';
 import Pagina from '../componentes/Pagina';
 import { dinero, primerNombre, saludo } from '../formato';
 
+function fechaEnElSalvador() {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/El_Salvador',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+  const valor = Object.fromEntries(partes.map((parte) => [parte.type, parte.value]));
+  return `${valor.year}-${valor.month}-${valor.day}`;
+}
+
+function fechaPedido(fecha) {
+  return new Date(`${fecha}T12:00:00`).toLocaleDateString('es-SV', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
 export default function Panel() {
   const { usuario, esPropietaria, llamar } = useAuth();
   const [alertas, setAlertas] = useState([]);
   const [resumen, setResumen] = useState(null);
+  const [pedidosPendientes, setPedidosPendientes] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -15,9 +35,14 @@ export default function Panel() {
     llamar('/api/productos/alertas').then((d) => activo && setAlertas(d)).catch((e) => activo && setError(e.message));
     if (esPropietaria) {
       llamar('/api/ventas/resumen-hoy').then((d) => activo && setResumen(d)).catch((e) => activo && setError(e.message));
+      llamar('/api/compras/pedidos').then((d) => activo && setPedidosPendientes(d)).catch((e) => activo && setError(e.message));
     }
     return () => { activo = false; };
   }, [llamar, esPropietaria]);
+
+  const hoy = fechaEnElSalvador();
+  const pedidosUrgentes = (pedidosPendientes || []).filter((pedido) => pedido.fechaEsperada <= hoy);
+  const pedidosVencidos = pedidosUrgentes.filter((pedido) => pedido.fechaEsperada < hoy).length;
 
   return (
     <Pagina titulo={`${saludo()}, ${primerNombre(usuario.nombre)}`} subtitulo="Resumen de hoy">
@@ -41,6 +66,31 @@ export default function Panel() {
             </section>
           </>
         )}
+        {esPropietaria && pedidosPendientes !== null && (
+          <section className={`aviso ${pedidosUrgentes.length ? '' : 'aviso-ok'}`}>
+            <span>
+              {pedidosUrgentes.length === 0
+                ? 'No hay pedidos para recibir hoy ni atrasados.'
+                : <>
+                  <b>{pedidosUrgentes.length} {pedidosUrgentes.length === 1 ? 'pedido' : 'pedidos'}</b> por recibir
+                  {pedidosVencidos > 0 && ` · ${pedidosVencidos} atrasado${pedidosVencidos === 1 ? '' : 's'}`}
+                </>}
+            </span>
+            <Link className="enlace-boton" to="/compras?pestana=calendario">Ver calendario</Link>
+          </section>
+        )}
+        {esPropietaria && pedidosUrgentes.map((pedido) => (
+          <section className="c lista" key={pedido.id}>
+            <div className="fila">
+              <b>{pedido.proveedor || 'Sin distribuidor'}</b>
+              <span className={pedido.fechaEsperada < hoy ? 'error-suave' : 'm'}>
+                {pedido.fechaEsperada < hoy ? 'Atrasado' : 'Recibir hoy'}
+              </span>
+            </div>
+            <div className="m">{fechaPedido(pedido.fechaEsperada)}</div>
+            <div className="m">{pedido.items.map((item) => `${item.cantidad} × ${item.nombre}`).join(' · ')}</div>
+          </section>
+        ))}
         <section className={`aviso ${alertas.length ? '' : 'aviso-ok'}`}>
           <span>
             {alertas.length

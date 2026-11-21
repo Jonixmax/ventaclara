@@ -7,6 +7,7 @@ Sistema web de ventas, compras e inventario para comercios multirubro (Tienda Em
 - Inicio de sesión con roles (propietaria y empleado); la sesión usa una cookie HttpOnly y limita intentos fallidos.
 - Ventas por rubro con dinero recibido y vuelto, historial y comprobantes imprimibles; la propietaria puede anular ventas de días sin cierre y devolver el inventario.
 - Compras de mercadería: cantidad, costo por unidad y proveedor; pueden registrarse al recibirlas o programarse en un calendario. Los pedidos programados solo actualizan el inventario al marcarlos como recibidos.
+- Distribuidores: contactos de WhatsApp editables, con opción de inactivar y conservarlos en pedidos anteriores.
 - Inventario fácil de leer: estados con texto (pedir ya, por agotarse, bien), barra de nivel, cantidad sugerida a comprar, valor del inventario y lista de pedido para el proveedor.
 - Reportes de hoy y del mes: ventas, ganancia estimada por rubro y compras; cierre de caja con diferencia.
 - Modo claro y oscuro.
@@ -16,7 +17,7 @@ Sistema web de ventas, compras e inventario para comercios multirubro (Tienda Em
 ```
 ventaclara/
   server/    API REST (Node.js, Express y MongoDB)
-    src/models/       Usuario, Rubro, Producto, Venta, Compra, PedidoCompra, CierreCaja, Contador
+    src/models/       Usuario, Rubro, Producto, Venta, Compra, PedidoCompra, Distribuidor, CierreCaja, Contador
     src/middleware/   sesión (token) y permisos por rol
     src/services/     sesión, ventas, compras, productos, cierre de caja y usuarios
     src/routes/       rutas de la API
@@ -72,6 +73,7 @@ Requisitos: Node.js 22 LTS (mínimo 20.19) y una cuenta en MongoDB Atlas.
 | POST | /api/compras/pedidos | Propietaria | Programa un pedido con su fecha esperada de recepción sin cambiar existencias |
 | GET | /api/compras/pedidos | Propietaria | Lista pedidos pendientes para el calendario |
 | POST | /api/compras/pedidos/:id/recibir | Propietaria | Marca un pedido como recibido, registra la compra y suma existencias |
+| GET / POST / PUT | /api/distribuidores, /api/distribuidores/:id | Propietaria | Administra distribuidores y sus contactos de WhatsApp |
 | GET | /api/reportes/rubros?periodo=hoy\|mes | Propietaria | Ventas, ganancia y compras |
 | GET | /api/cierres/previsualizar | Propietaria | Total del sistema hoy y si ya hay cierre |
 | POST | /api/cierres | Propietaria | Guarda el cierre de caja del día (uno por día) |

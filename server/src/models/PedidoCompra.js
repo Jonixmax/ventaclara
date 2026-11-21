@@ -23,6 +23,7 @@ const pedidoCompraSchema = new Schema(
   {
     fechaEsperada: { type: String, required: true, match: /^\d{4}-\d{2}-\d{2}$/ },
     usuarioId: { type: Schema.Types.ObjectId, ref: 'Usuario', required: true },
+    distribuidorId: { type: Schema.Types.ObjectId, ref: 'Distribuidor' },
     proveedor: { type: String, trim: true, maxlength: [60, 'El nombre del proveedor no puede pasar de 60 caracteres.'] },
     items: {
       type: [itemPedidoSchema],

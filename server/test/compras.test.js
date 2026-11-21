@@ -6,6 +6,7 @@ const jwt = require('jsonwebtoken');
 const app = require('../src/app');
 const Producto = require('../src/models/Producto');
 const PedidoCompra = require('../src/models/PedidoCompra');
+const Distribuidor = require('../src/models/Distribuidor');
 const Venta = require('../src/models/Venta');
 const { normalizarItemsCompra, prepararCompra, productosConPrecioBajo, normalizarFechaEsperada, programarPedido } = require('../src/services/compraService');
 const { prepararProducto } = require('../src/services/productoService');
@@ -90,6 +91,37 @@ test('pedido: programarlo no modifica las existencias', async () => {
   } finally {
     Producto.find = originales.buscarProductos;
     Producto.findOneAndUpdate = originales.actualizarProducto;
+    PedidoCompra.create = originales.crearPedido;
+  }
+});
+
+test('pedido: guarda el distribuidor elegido y conserva su nombre como proveedor', async () => {
+  const originales = {
+    buscarDistribuidor: Distribuidor.findOne,
+    buscarProductos: Producto.find,
+    crearPedido: PedidoCompra.create,
+  };
+  const idDistribuidor = oid();
+  let datosGuardados;
+  Distribuidor.findOne = async () => ({ _id: idDistribuidor, nombre: 'Distribuidora Uno', activo: true });
+  Producto.find = async () => catalogo;
+  PedidoCompra.create = async (pedidos) => {
+    [datosGuardados] = pedidos;
+    return pedidos;
+  };
+  try {
+    const pedido = await programarPedido(
+      [{ productoId: ID_A, cantidad: '5', costoUnitario: '0.45' }],
+      'usuario-prueba',
+      '',
+      '2026-11-15',
+      String(idDistribuidor)
+    );
+    assert.strictEqual(pedido.proveedor, 'Distribuidora Uno');
+    assert.strictEqual(String(datosGuardados.distribuidorId), String(idDistribuidor));
+  } finally {
+    Distribuidor.findOne = originales.buscarDistribuidor;
+    Producto.find = originales.buscarProductos;
     PedidoCompra.create = originales.crearPedido;
   }
 });
