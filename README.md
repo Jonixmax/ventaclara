@@ -10,6 +10,7 @@ Sistema web de ventas, compras e inventario para comercios multirubro (Tienda Em
 - Distribuidores: contactos de WhatsApp editables, con opción de inactivar y conservarlos en pedidos anteriores.
 - Inventario fácil de leer: estados con texto (pedir ya, por agotarse, bien), barra de nivel, cantidad sugerida a comprar, valor del inventario y lista de pedido para el proveedor.
 - Reportes de hoy y del mes: ventas, ganancia estimada por rubro y compras; cierre de caja con diferencia.
+- Ayuda guiada con instrucciones para ventas, inventario, compras y cierres; funciona localmente y no accede a los datos del negocio.
 - Modo claro y oscuro.
 
 ## Estructura
@@ -62,7 +63,7 @@ Requisitos: Node.js 22 LTS (mínimo 20.19) y una cuenta en MongoDB Atlas.
 | GET | /api/productos | Con sesión | Catálogo (el costo solo lo recibe la propietaria) |
 | GET | /api/productos?todos=1 | Propietaria | Incluye productos inactivos |
 | GET | /api/productos/alertas | Con sesión | Productos por agotarse |
-| POST / PUT | /api/productos, /api/productos/:id | Propietaria | Agrega o edita productos |
+| POST / PUT | /api/productos, /api/productos/:id | Propietaria | Agrega o edita productos; permite inactivarlos sin borrar su historial |
 | POST | /api/ventas | Propietaria y empleado | Registra una venta (stock, folio, costo y vuelto) |
 | GET | /api/ventas?desde=AAAA-MM-DD&hasta=AAAA-MM-DD&comprobante=V-000001 | Propietaria y empleado | Historial filtrado y paginado |
 | GET | /api/ventas/:id | Propietaria y empleado | Consulta venta para reimprimir el comprobante |
@@ -77,6 +78,7 @@ Requisitos: Node.js 22 LTS (mínimo 20.19) y una cuenta en MongoDB Atlas.
 | GET | /api/reportes/rubros?periodo=hoy\|mes | Propietaria | Ventas, ganancia y compras |
 | GET | /api/cierres/previsualizar | Propietaria | Total del sistema hoy y si ya hay cierre |
 | POST | /api/cierres | Propietaria | Guarda el cierre de caja del día (uno por día) |
+| PUT | /api/cierres/:id | Propietaria | Corrige el efectivo contado de un cierre existente y recalcula la diferencia |
 | GET / POST / PUT | /api/usuarios, /api/usuarios/:id | Propietaria | Administra empleados |
 
 ## Reglas del equipo
@@ -84,5 +86,6 @@ Requisitos: Node.js 22 LTS (mínimo 20.19) y una cuenta en MongoDB Atlas.
 - El archivo `.env` NUNCA se sube a GitHub (ya está en `.gitignore`).
 - El precio de una venta lo decide la API con el catálogo; el navegador nunca lo envía.
 - El costo de compra es solo de la propietaria: el empleado nunca lo recibe.
+- Al borrar un producto del inventario, se inactiva para conservar su historial de ventas y compras; se puede reactivar desde su edición.
 - `CLIENT_URL` debe ser el origen exacto del cliente publicado (protocolo y dominio, sin rutas). En producción el servidor debe usar HTTPS para la cookie de sesión. Para evitar bloqueos de cookies entre sitios, publica cliente y API bajo el mismo sitio (por ejemplo, subdominios) o configura un proxy del API en el dominio del cliente.
 - Para publicar el sistema, sigue `GUIA_PUBLICACION.md`.

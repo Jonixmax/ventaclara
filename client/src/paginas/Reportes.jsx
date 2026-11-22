@@ -11,7 +11,10 @@ export default function Reportes() {
   const [datos, setDatos] = useState(null);
   const [cierre, setCierre] = useState(null);
   const [efectivo, setEfectivo] = useState('');
+  const [editandoCierre, setEditandoCierre] = useState(false);
+  const [efectivoEdicion, setEfectivoEdicion] = useState('');
   const [error, setError] = useState('');
+  const [mensaje, setMensaje] = useState('');
   const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
@@ -34,12 +37,46 @@ export default function Reportes() {
   const totalCentavos = datos ? Math.round(datos.total * 100) : 0;
   const efectivoValido = FORMATO_MONTO.test(efectivo.trim());
   const diferencia = efectivoValido ? Math.round(Number(efectivo.trim().replace(',', '.')) * 100) - totalCentavos : null;
+  const efectivoEdicionValido = FORMATO_MONTO.test(efectivoEdicion.trim());
+  const diferenciaEdicion = efectivoEdicionValido && cierre
+    ? Math.round(Number(efectivoEdicion.trim().replace(',', '.')) * 100) - Math.round(cierre.totalSistema * 100)
+    : null;
 
-  function textoDiferencia() {
-    if (diferencia === null) return { clase: '', texto: 'Se calcula al escribir' };
-    if (diferencia === 0) return { clase: 'cuadra', texto: 'La caja cuadra' };
-    if (diferencia > 0) return { clase: 'sobra', texto: `Sobran ${dinero(diferencia / 100)}` };
-    return { clase: 'falta', texto: `Faltan ${dinero(-diferencia / 100)}` };
+  function textoDiferencia(valor) {
+    if (valor === null) return { clase: '', texto: 'Se calcula al escribir' };
+    if (valor === 0) return { clase: 'cuadra', texto: 'La caja cuadra' };
+    if (valor > 0) return { clase: 'sobra', texto: `Sobran ${dinero(valor / 100)}` };
+    return { clase: 'falta', texto: `Faltan ${dinero(-valor / 100)}` };
+  }
+
+  function iniciarEdicionCierre() {
+    setEfectivoEdicion(Number(cierre.efectivoContado).toFixed(2));
+    setEditandoCierre(true);
+    setError('');
+    setMensaje('');
+  }
+
+  async function guardarEdicionCierre() {
+    if (!efectivoEdicionValido) {
+      setError('Escriba el efectivo contado.');
+      return;
+    }
+    setGuardando(true);
+    setError('');
+    setMensaje('');
+    try {
+      const actualizado = await llamar(`/api/cierres/${cierre.id}`, {
+        method: 'PUT',
+        cuerpo: { efectivoContado: efectivoEdicion.trim() },
+      });
+      setCierre(actualizado);
+      setEditandoCierre(false);
+      setMensaje('Se actualizó el cierre de caja.');
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setGuardando(false);
+    }
   }
 
   async function guardar() {
@@ -59,7 +96,8 @@ export default function Reportes() {
     }
   }
 
-  const mostrarDiferencia = textoDiferencia();
+  const mostrarDiferencia = textoDiferencia(diferencia);
+  const mostrarDiferenciaEdicion = textoDiferencia(diferenciaEdicion);
   const compras = datos?.compras;
   return (
     <Pagina titulo="Reportes" subtitulo="Ventas, ganancia y cierre de caja">
@@ -117,7 +155,31 @@ export default function Reportes() {
           <div className={`dif ${cierre.diferencia === 0 ? 'cuadra' : cierre.diferencia > 0 ? 'sobra' : 'falta'}`}>
             {cierre.diferencia === 0 ? 'La caja cuadra' : cierre.diferencia > 0 ? `Sobraron ${dinero(cierre.diferencia)}` : `Faltaron ${dinero(-cierre.diferencia)}`}
           </div>
-          <p className="m centro" style={{ margin: 0 }}>Ya se hizo el cierre de hoy.</p>
+          {mensaje && <p className="aviso aviso-ok" role="status">{mensaje}</p>}
+          {editandoCierre ? (
+            <>
+              <div>
+                <label htmlFor="efectivo-edicion">Corregir efectivo contado</label>
+                <input id="efectivo-edicion" type="text" inputMode="decimal" placeholder="0.00" value={efectivoEdicion}
+                  onChange={(e) => { setEfectivoEdicion(e.target.value); setError(''); }} />
+              </div>
+              <div className={`dif ${mostrarDiferenciaEdicion.clase}`} aria-live="polite">
+                Diferencia recalculada: {mostrarDiferenciaEdicion.texto}
+              </div>
+              <p className="m" style={{ margin: 0 }}>Se conserva el total del sistema registrado en el cierre original.</p>
+              <button type="button" className="btn" onClick={guardarEdicionCierre} disabled={guardando}>
+                {guardando ? 'Guardando…' : 'Guardar corrección'}
+              </button>
+              <button type="button" className="btn btn-claro" onClick={() => { setEditandoCierre(false); setError(''); }} disabled={guardando}>
+                Cancelar
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="m centro" style={{ margin: 0 }}>Ya se hizo el cierre de hoy.</p>
+              <button type="button" className="btn btn-claro" onClick={iniciarEdicionCierre}>Editar cierre</button>
+            </>
+          )}
         </section>
       ) : (
         <>

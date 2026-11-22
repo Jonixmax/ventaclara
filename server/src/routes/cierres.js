@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { previsualizarCierre, registrarCierre } = require('../services/cierreService');
+const { previsualizarCierre, registrarCierre, actualizarCierre } = require('../services/cierreService');
 const { requerirSesion, requerirRol } = require('../middleware/auth');
 
 const router = Router();
@@ -17,6 +17,15 @@ router.get('/previsualizar', requerirSesion, requerirRol('propietaria'), async (
 router.post('/', requerirSesion, requerirRol('propietaria'), async (req, res, next) => {
   try {
     res.status(201).json(await registrarCierre(req.body?.efectivoContado, req.usuario.id));
+  } catch (error) {
+    next(error);
+  }
+});
+
+// PUT /api/cierres/:id (solo propietaria): corrige el efectivo contado sin crear otro cierre
+router.put('/:id', requerirSesion, requerirRol('propietaria'), async (req, res, next) => {
+  try {
+    res.json(await actualizarCierre(req.params.id, req.body?.efectivoContado, req.usuario.id));
   } catch (error) {
     next(error);
   }

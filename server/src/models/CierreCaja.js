@@ -17,8 +17,9 @@ const cierreCajaSchema = new Schema(
       new Schema({ rubroId: { type: Schema.Types.ObjectId, ref: 'Rubro', required: true }, total: dinero }, { _id: false }),
     ],
     usuarioId: { type: Schema.Types.ObjectId, ref: 'Usuario', required: true },
+    actualizadoPor: { type: Schema.Types.ObjectId, ref: 'Usuario' },
   },
-  { timestamps: { createdAt: 'creadoEn', updatedAt: false } }
+  { timestamps: { createdAt: 'creadoEn', updatedAt: 'actualizadoEn' } }
 );
 
 cierreCajaSchema.set('toJSON', {

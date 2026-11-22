@@ -2,6 +2,7 @@ import { NavLink } from 'react-router-dom';
 import { useState } from 'react';
 import { useAuth } from '../AuthContext';
 import BotonTema from './BotonTema';
+import AyudaGuiada from './AyudaGuiada';
 
 // Estructura común: barra superior, contenido y navegación (inferior en celular, lateral en computadora)
 export default function Pagina({ titulo, subtitulo, children }) {
@@ -44,6 +45,7 @@ export default function Pagina({ titulo, subtitulo, children }) {
         {error && <p className="error" role="alert">{error}</p>}
         {children}
       </main>
+      <AyudaGuiada />
     </div>
   );
 }

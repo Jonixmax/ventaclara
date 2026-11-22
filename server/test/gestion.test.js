@@ -7,6 +7,8 @@ const { prepararProducto } = require('../src/services/productoService');
 const { montoACentavos, enteroNoNegativo } = require('../src/utils/validaciones');
 const { calcularDiferenciaCaja } = require('../src/utils/dinero');
 const { rangoDelMes } = require('../src/utils/fechas');
+const CierreCaja = require('../src/models/CierreCaja');
+const { actualizarCierre } = require('../src/services/cierreService');
 
 const RUBRO = 'c'.repeat(24);
 const valido = { rubroId: RUBRO, nombre: 'Azúcar 1 lb', precio: '0.75', existencias: '20', stockMinimo: '5' };
@@ -67,6 +69,35 @@ test('caja: la diferencia es efectivo menos sistema (positiva sobra, negativa fa
   assert.strictEqual(calcularDiferenciaCaja(4800, 4875), -75);
 });
 
+test('cierre: editar efectivo recalcula la diferencia y conserva el total original', async () => {
+  const original = CierreCaja.findById;
+  const cierre = {
+    totalSistema: { toString: () => '12.34' },
+    efectivoContado: null,
+    diferencia: null,
+    actualizadoPor: null,
+    save: async () => cierre,
+  };
+  CierreCaja.findById = async () => cierre;
+  try {
+    const actualizado = await actualizarCierre('a'.repeat(24), '15.00', 'b'.repeat(24));
+    assert.strictEqual(actualizado.efectivoContado.toString(), '15.00');
+    assert.strictEqual(actualizado.diferencia.toString(), '2.66');
+    assert.strictEqual(actualizado.totalSistema.toString(), '12.34');
+    assert.strictEqual(actualizado.actualizadoPor, 'b'.repeat(24));
+  } finally {
+    CierreCaja.findById = original;
+  }
+});
+
+test('cierre: valida el id y el efectivo antes de consultar la base de datos', async () => {
+  await assert.rejects(actualizarCierre('123', '1.00', 'b'.repeat(24)), { status: 404 });
+  await assert.rejects(actualizarCierre('a'.repeat(24), 'abc', 'b'.repeat(24)), {
+    status: 400,
+    message: 'Escriba el efectivo contado.',
+  });
+});
+
 test('mes: usa la hora de El Salvador (UTC-6)', () => {
   const mes = (iso) => rangoDelMes(new Date(iso));
   assert.strictEqual(mes('2026-11-03T15:42:10Z').inicio.toISOString(), '2026-11-01T06:00:00.000Z');
@@ -90,6 +121,7 @@ test('API de gestión: permisos y validaciones previas a la base de datos', asyn
   try {
     // El empleado no puede gestionar productos, cerrar caja ni ver reportes
     for (const [ruta, metodo] of [['/api/productos', 'POST'], ['/api/productos/' + RUBRO, 'PUT'], ['/api/cierres', 'POST'],
+      ['/api/cierres/' + RUBRO, 'PUT'],
       ['/api/cierres/previsualizar', 'GET'], ['/api/reportes/rubros', 'GET']]) {
       const r = await enviar(ruta, 'empleado', metodo, metodo === 'GET' ? undefined : {});
       assert.strictEqual(r.status, 403, `${metodo} ${ruta}`);
@@ -107,6 +139,10 @@ test('API de gestión: permisos y validaciones previas a la base de datos', asyn
     const cierre = await enviar('/api/cierres', 'propietaria', 'POST', { efectivoContado: 'abc' });
     assert.strictEqual(cierre.status, 400);
     assert.strictEqual((await cierre.json()).mensaje, 'Escriba el efectivo contado.');
+
+    const editarCierre = await enviar(`/api/cierres/${RUBRO}`, 'propietaria', 'PUT', { efectivoContado: 'abc' });
+    assert.strictEqual(editarCierre.status, 400);
+    assert.strictEqual((await editarCierre.json()).mensaje, 'Escriba el efectivo contado.');
 
     const periodo = await enviar('/api/reportes/rubros?periodo=semana', 'propietaria');
     assert.strictEqual(periodo.status, 400);

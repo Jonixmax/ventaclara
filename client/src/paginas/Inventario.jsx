@@ -20,7 +20,7 @@ function consejo(p, esPropietaria) {
   return 'Hay suficiente.';
 }
 
-function Tarjeta({ p, color, esPropietaria }) {
+function Tarjeta({ p, color, esPropietaria, onBorrar, borrando }) {
   const grupo = p.activo ? p.estadoStock : 'inactivo';
   // La barra se llena hasta la meta: 3 veces el stock mínimo
   const meta = Math.max(1, p.stockMinimo * 3);
@@ -61,6 +61,16 @@ function Tarjeta({ p, color, esPropietaria }) {
         <div className="acciones-fila">
           {p.activo && <Link className="enlace-boton" to={`/compras?producto=${p.id}`} aria-label={`Comprar ${p.nombre}`}>Comprar</Link>}
           <Link className="enlace-boton" to={`/producto/${p.id}`} aria-label={`Editar ${p.nombre}`}>Editar</Link>
+          {p.activo && (
+            <button type="button" className="btn-mini btn-peligro" disabled={borrando} onClick={() => {
+              const confirmar = window.confirm(
+                `¿Borrar ${p.nombre} del inventario? Dejará de aparecer en ventas. Se conservará para el historial y podrás reactivarlo desde Editar.`
+              );
+              if (confirmar) onBorrar(p);
+            }}>
+              {borrando ? 'Quitando…' : 'Borrar'}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -76,6 +86,7 @@ export default function Inventario() {
   const [filtro, setFiltro] = useState(params.get('alertas') === '1' ? 'alertas' : 'todos');
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
+  const [borrando, setBorrando] = useState('');
 
   useEffect(() => {
     let activo = true;
@@ -111,6 +122,21 @@ export default function Inventario() {
   function quitarFiltro() {
     setFiltro('todos');
     setParams({});
+  }
+
+  async function borrarProducto(producto) {
+    setBorrando(producto.id);
+    setError('');
+    setMensaje('');
+    try {
+      const actualizado = await llamar(`/api/productos/${producto.id}`, { method: 'PUT', cuerpo: { activo: false } });
+      setProductos((actuales) => actuales.map((item) => item.id === actualizado.id ? actualizado : item));
+      setMensaje(`${producto.nombre} se quitó de los productos activos. Se conservó su historial.`);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBorrando('');
+    }
   }
 
   // Lista de pedido para mandar al proveedor (por WhatsApp, por ejemplo)
@@ -176,7 +202,10 @@ export default function Inventario() {
       {grupos.map(({ g, lista }) => (
         <section key={g} className="lista" aria-label={ESTADOS_TITULO[g]}>
           <h2 className="grupo-titulo">{ESTADOS_TITULO[g]} ({lista.length})</h2>
-          {lista.map((p) => <Tarjeta key={p.id} p={p} color={colores[p.rubroId]} esPropietaria={esPropietaria} />)}
+          {lista.map((p) => (
+            <Tarjeta key={p.id} p={p} color={colores[p.rubroId]} esPropietaria={esPropietaria}
+              onBorrar={borrarProducto} borrando={borrando === p.id} />
+          ))}
         </section>
       ))}
     </Pagina>

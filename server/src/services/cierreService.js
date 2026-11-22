@@ -6,6 +6,8 @@ const { aDecimal } = require('../utils/decimal128');
 const { rangoDelDia } = require('../utils/fechas');
 const { resumenDelDia } = require('./ventaService');
 
+const ES_OBJECT_ID = /^[a-f0-9]{24}$/i;
+
 // Muestra el total que registra el sistema hoy y si ya existe un cierre
 async function previsualizarCierre(fecha = new Date()) {
   const { inicio } = rangoDelDia(fecha);
@@ -38,4 +40,16 @@ async function registrarCierre(efectivoContado, usuarioId, fecha = new Date()) {
   });
 }
 
-module.exports = { previsualizarCierre, registrarCierre };
+async function actualizarCierre(id, efectivoContado, usuarioId) {
+  if (!ES_OBJECT_ID.test(String(id))) throw crearError(404, 'No se encontró el cierre de caja.');
+  const efectivoCentavos = montoACentavos(efectivoContado, 'Escriba el efectivo contado.');
+  const cierre = await CierreCaja.findById(id);
+  if (!cierre) throw crearError(404, 'No se encontró el cierre de caja.');
+  const totalSistemaCentavos = aCentavos(Number(cierre.totalSistema.toString()));
+  cierre.efectivoContado = aDecimal(efectivoCentavos);
+  cierre.diferencia = aDecimal(calcularDiferenciaCaja(efectivoCentavos, totalSistemaCentavos));
+  cierre.actualizadoPor = usuarioId;
+  return cierre.save();
+}
+
+module.exports = { previsualizarCierre, registrarCierre, actualizarCierre };
