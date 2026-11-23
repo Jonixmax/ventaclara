@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 
 const app = express();
+app.set('trust proxy', 1);
 const clientOrigin = new URL(process.env.CLIENT_URL || 'http://localhost:5173').origin;
 
 app.use(helmet());
